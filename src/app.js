@@ -94,6 +94,8 @@ app.post("/register", async (c) => {
   const count = cntRow?.c || 0;
   const role = count === 0 ? "admin" : "member";
 
+  const pinHash = await hashPin(pin);
+
   let uid;
   try {
     const meta = await run(
@@ -101,12 +103,16 @@ app.post("/register", async (c) => {
       "INSERT INTO user (name, role, pin_hash, active, failed_count, created_at) VALUES (?, ?, ?, 1, 0, ?)",
       name,
       role,
-      await hashPin(pin),
+      pinHash,
       nowIso(),
     );
     uid = meta.last_row_id;
-  } catch {
-    return registerPage(c, { token, csrf, error: "その表示名は既に使われています", name }, 400);
+  } catch (e) {
+    // UNIQUE(name) 違反のみ「表示名重複」として扱う。それ以外は握りつぶさず onError へ。
+    if (/UNIQUE|constraint/i.test(String(e?.message || e))) {
+      return registerPage(c, { token, csrf, error: "その表示名は既に使われています", name }, 400);
+    }
+    throw e;
   }
 
   const max = parseInt(await getMeta(c.env.DB, "max_users", "4"), 10) || 4;

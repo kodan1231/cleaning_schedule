@@ -9,7 +9,10 @@ import { page } from "./views/layout.js";
 const ENC = new TextEncoder();
 const DEC = new TextDecoder();
 
-const PBKDF2_ITER = 210000;
+// Cloudflare Workers の Web Crypto は PBKDF2 の反復回数を 100000 に制限している
+// （超えると deriveBits が NotSupportedError を投げる）。docs/02 §6.2 は当初 210000 だったが
+// プラットフォーム上限に合わせる。verifyPin は保存済みハッシュ内の反復回数を使うため後方互換。
+const PBKDF2_ITER = 100000;
 const SESSION_TTL = 90 * 24 * 3600; // 秒（90日）
 
 const SESS_COOKIE = "sess";
