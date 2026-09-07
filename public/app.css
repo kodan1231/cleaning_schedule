@@ -135,3 +135,47 @@ form.inline { display: inline; margin: 0; }
 .pick input { width: 20px; height: 20px; }
 
 .err { border-color: #d9534f; color: #b02a24; background: #fdf2f2; }
+.ok-note { border-color: var(--green); color: var(--green-d); background: #eef6f1; }
+
+/* 管理画面 */
+h2.sub { font-size: 16px; margin: 22px 0 10px; }
+h3 { font-size: 14px; margin: 0 0 8px; }
+.sm { font-size: 12px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.big { font-size: 20px; font-weight: 700; letter-spacing: 2px; }
+
+.fld select, .fld textarea {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  min-height: 44px;
+}
+.fld textarea { min-height: 0; resize: vertical; }
+.fld.chk { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+.fld.chk input { width: 20px; height: 20px; }
+
+.admin-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-links .btn { text-decoration: none; }
+
+.tbl { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+.tbl th, .tbl td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; }
+.tbl th { background: #fafbfc; font-size: 12px; color: var(--muted); }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr.row-off td { opacity: 0.55; }
+
+.badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--line); color: var(--muted); margin-left: 6px; }
+.badge.photo { background: #fbeee0; color: var(--orange); }
+
+.area .items { list-style: none; margin: 0; padding: 0; }
+.item { border-top: 1px solid var(--line); padding: 8px 0; }
+.item:first-child { border-top: none; }
+.item summary { cursor: pointer; font-size: 14px; }
+.sub-form { margin: 10px 0; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.row-actions button { padding: 6px 10px; min-height: 36px; }
+button.sm, .btn.sm { padding: 6px 10px; min-height: 36px; font-size: 13px; }
+button.danger, .btn.danger { border-color: #d9534f; color: #b02a24; }
+button[disabled] { opacity: 0.4; cursor: not-allowed; }

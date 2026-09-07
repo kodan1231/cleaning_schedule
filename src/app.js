@@ -4,6 +4,7 @@ import { html } from "./lib/html.js";
 import { nowIso, isoPlusMinutes } from "./lib/datetime.js";
 import { page, authedPage } from "./views/layout.js";
 import { loginPage, registerPage } from "./views/auth.js";
+import { admin } from "./admin.js";
 import { one, all, run, getMeta, setMeta, ping } from "./db/queries.js";
 import {
   hashPin,
@@ -15,7 +16,6 @@ import {
   ensureCsrf,
   verifyCsrf,
   requireAuth,
-  requireAdmin,
   safeNext,
 } from "./auth.js";
 
@@ -210,18 +210,9 @@ app.get("/", requireAuth(), (c) => {
 });
 
 // ─────────────────────────────────────────────
-// 管理トップ（P2 で実装）
+// 管理（物件・テンプレート・ユーザー管理）
 // ─────────────────────────────────────────────
-app.get("/admin", requireAuth(), requireAdmin(), (c) => {
-  return authedPage(c, {
-    title: "管理",
-    active: "admin",
-    body: html`
-      <h1>管理メニュー</h1>
-      <div class="card muted">P2 で実装します（物件・テンプレート・ユーザー管理）。</div>
-    `,
-  });
-});
+app.route("/admin", admin);
 
 // ─────────────────────────────────────────────
 // 404 / エラー
