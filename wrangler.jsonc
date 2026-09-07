@@ -1,0 +1,5 @@
+{
+  "name": "ここにCloudflareで付けたプロジェクト名",
+  "compatibility_date": "2026-09-01",
+  "main": "src/index.js"
+}
