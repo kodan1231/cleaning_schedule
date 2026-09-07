@@ -1,5 +1,19 @@
 {
   "name": "cleaning_schedule",
   "compatibility_date": "2026-09-01",
-  "main": "src/index.js"
+  "main": "src/index.js",
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cleaning_schedule",
+      "database_id": "8299819e-57ec-4aa5-82f2-11ad6b8baf19"
+    }
+  ],
+  // R2 は当面未使用。将来有効化したら追加してデプロイ（docs/02 §7.4）
+  // "r2_buckets": [
+  //   { "binding": "PHOTOS", "bucket_name": "cleaning-schedule-photos" }
+  // ],
+  "triggers": { "crons": ["0 */3 * * *"] },
+  "vars": { "APP_TZ": "Asia/Tokyo", "APP_NAME": "民泊清掃" }
 }

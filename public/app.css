@@ -1,0 +1,107 @@
+:root {
+  --green: #2f6f4f;
+  --green-d: #245a40;
+  --orange: #c9741f;
+  --gray: #8a8f98;
+  --bg: #f6f7f8;
+  --card: #ffffff;
+  --line: #e2e4e8;
+  --text: #1d2129;
+  --muted: #6b7280;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  line-height: 1.6;
+}
+
+a { color: var(--green-d); }
+
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--green);
+  color: #fff;
+}
+.appbar .brand { font-weight: 700; }
+.appbar .who { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 14px 88px;
+}
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabbar a {
+  flex: 1;
+  text-align: center;
+  padding: 12px 0;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.tabbar a.on { color: var(--green); font-weight: 700; }
+
+h1 { font-size: 20px; margin: 4px 0 12px; }
+.muted { color: var(--muted); }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+button, .btn {
+  font: inherit;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: #fff;
+  cursor: pointer;
+  min-height: 44px;
+}
+button.secondary, .btn.secondary {
+  background: #fff;
+  color: var(--green-d);
+}
+.linklike {
+  background: none;
+  border: none;
+  color: #fff;
+  text-decoration: underline;
+  padding: 0;
+  min-height: 0;
+  cursor: pointer;
+}
+form.inline { display: inline; margin: 0; }
+
+.status-pending { color: var(--gray); }
+.status-in_progress { color: var(--orange); }
+.status-done { color: var(--green); }

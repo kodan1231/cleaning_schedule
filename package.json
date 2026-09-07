@@ -1,0 +1,33 @@
+{
+  "name": "cleaning_schedule",
+  "version": "1.0.0",
+  "description": "read me first",
+  "main": "src/index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute cleaning_schedule --local --file src/db/schema.sql",
+    "db:remote": "wrangler d1 execute cleaning_schedule --remote --file src/db/schema.sql"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kodan1231/cleaning_schedule.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/kodan1231/cleaning_schedule/issues"
+  },
+  "homepage": "https://github.com/kodan1231/cleaning_schedule#readme",
+  "dependencies": {
+    "hono": "^4.13.7"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.0"
+  }
+}
