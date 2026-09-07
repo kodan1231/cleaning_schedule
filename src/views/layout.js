@@ -5,11 +5,12 @@ import { html, raw, render } from "../lib/html.js";
  * @param {object} o
  * @param {string} o.title      ページタイトル
  * @param {object} [o.user]     現在ユーザー { name, role }
+ * @param {string} [o.csrf]     CSRF トークン（ログアウトフォーム用）
  * @param {string} [o.active]   タブバーのアクティブ項目 'home' | 'history' | 'admin'
  * @param {object} o.body       html`` で生成した本文ノード
  * @param {string} [o.appName]  アプリ名
  */
-export function layout({ title, user, active, body, appName = "民泊清掃" }) {
+export function layout({ title, user, csrf, active, body, appName = "民泊清掃" }) {
   const tabs = user
     ? html`
         <nav class="tabbar">
@@ -28,6 +29,7 @@ export function layout({ title, user, active, body, appName = "民泊清掃" }) 
       ${user
         ? html`<span class="who">${user.name}
             <form method="post" action="/logout" class="inline">
+              ${csrf ? html`<input type="hidden" name="_csrf" value="${csrf}">` : raw("")}
               <button class="linklike" type="submit">ログアウト</button>
             </form>
           </span>`
@@ -59,10 +61,19 @@ ${render(tabs)}
 </html>`);
 }
 
-/** Response を作るショートカット */
-export function page(opts, status = 200) {
-  return new Response(render(layout(opts)), {
+/**
+ * Response を作るショートカット。
+ * c.html() を使うことで、事前に setCookie 等で設定したヘッダを保持する。
+ */
+export function page(c, opts, status = 200) {
+  return c.html(render(layout(opts)), status);
+}
+
+/** ログイン済みページ用: user/csrf/appName を context から補完 */
+export function authedPage(c, opts, status = 200) {
+  return page(
+    c,
+    { ...opts, user: c.get("user"), csrf: c.get("csrf"), appName: c.env.APP_NAME },
     status,
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+  );
 }

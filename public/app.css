@@ -105,3 +105,33 @@ form.inline { display: inline; margin: 0; }
 .status-pending { color: var(--gray); }
 .status-in_progress { color: var(--orange); }
 .status-done { color: var(--green); }
+
+/* フォーム */
+.form { display: flex; flex-direction: column; gap: 14px; }
+.fld { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+.fld input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  min-height: 44px;
+}
+.form button { align-self: flex-start; }
+
+.userpick { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0; }
+.userpick legend { font-size: 13px; color: var(--muted); padding: 0 4px; }
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  font-size: 16px;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+}
+.pick:last-child { border-bottom: none; }
+.pick input { width: 20px; height: 20px; }
+
+.err { border-color: #d9534f; color: #b02a24; background: #fdf2f2; }

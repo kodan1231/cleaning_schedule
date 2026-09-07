@@ -12,6 +12,11 @@ export function todayJst() {
   return ymdInTz(new Date(), TZ);
 }
 
+/** 現在から min 分後の ISO8601 UTC 文字列 */
+export function isoPlusMinutes(min) {
+  return new Date(Date.now() + min * 60000).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 /** Date を指定タイムゾーンの YYYY-MM-DD にする */
 export function ymdInTz(date, tz = TZ) {
   const parts = new Intl.DateTimeFormat("en-CA", {
