@@ -1,5 +1,5 @@
 {
-  "name": "ここにCloudflareで付けたプロジェクト名",
+  "name": "cleaning_schedule",
   "compatibility_date": "2026-09-01",
   "main": "src/index.js"
 }
