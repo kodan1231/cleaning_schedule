@@ -9,6 +9,13 @@ if ("serviceWorker" in navigator) {
       console.warn("SW 登録失敗", e);
     });
   });
+  // 新しい SW が制御を奪ったら一度だけリロードして最新アセットに切り替え
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
 }
 
 // ── チェックリスト トグル ──
