@@ -50,6 +50,41 @@ export function fmtDateTimeJst(iso) {
   }).format(d);
 }
 
+/** "YYYY-MM" を delta か月ずらす */
+export function shiftMonth(ym, delta) {
+  let [y, m] = ym.split("-").map(Number);
+  m += delta - 1;
+  y += Math.floor(m / 12);
+  m = ((m % 12) + 12) % 12;
+  return `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
+/** "YYYY-MM" の月末日を "YYYY-MM-DD" で返す */
+export function lastDayOfMonth(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${ym}-${String(d).padStart(2, "0")}`;
+}
+
+/**
+ * "YYYY-MM" のカレンダー配列（日曜始まり）。
+ * 週ごとの配列で、各セルは { date:"YYYY-MM-DD", day } か null（月外）。
+ */
+export function monthGrid(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const startDow = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= days; d++) {
+    cells.push({ date: `${ym}-${String(d).padStart(2, "0")}`, day: d });
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
 /** YYYY-MM-DD を "M/D(曜)" 表示にする */
 export function fmtDateJst(ymd) {
   if (!ymd) return "";

@@ -181,8 +181,83 @@ button.danger, .btn.danger { border-color: #d9534f; color: #b02a24; }
 button[disabled] { opacity: 0.4; cursor: not-allowed; }
 
 /* 清掃カード / 詳細 */
+.dash-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dash-head h1 { margin: 4px 0 12px; }
+.invite-url {
+  width: 100%;
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fafbfc;
+  color: var(--text);
+}
 .filter { padding: 12px 14px; }
 .filter .fld { margin: 0; }
+
+.overdue-banner {
+  display: block;
+  border-color: #d9534f;
+  color: #b02a24;
+  background: #fdf2f2;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+/* 月カレンダー */
+.cal {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 10px;
+}
+.cal-title { font-weight: 700; }
+.cal-arrow {
+  text-decoration: none;
+  font-size: 22px;
+  line-height: 1;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--green-d);
+}
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-dow { margin-bottom: 3px; }
+.dow { text-align: center; font-size: 11px; color: var(--muted); padding: 2px 0; }
+.dow.sun { color: #c0392b; }
+.dow.sat { color: #2b6cb0; }
+
+.cal-cell {
+  position: relative;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 4px;
+  text-decoration: none;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.cal-cell.empty { border: none; }
+.cal-cell.has { background: #fafbfc; }
+.cal-cell.today { border-color: var(--green); }
+.cal-cell.sel { outline: 2px solid var(--green); outline-offset: -1px; background: #eef6f1; }
+.cal-num { font-size: 12px; font-variant-numeric: tabular-nums; }
+.cal-dots { display: flex; gap: 2px; }
+.cal-dots .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.dot.status-pending { background: var(--gray); }
+.dot.status-in_progress { background: var(--orange); }
+.dot.status-done { background: var(--green); }
+.cal-n { font-size: 10px; color: var(--muted); line-height: 1; }
 
 .clist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .ccard {

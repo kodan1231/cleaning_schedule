@@ -43,6 +43,10 @@ export function loginPage(c, { users = [], csrf, next = "", error = "" }, status
           </label>
           <button type="submit">ログイン</button>
         </form>
+        <p class="muted sm">
+          アカウントがない場合は、管理者から登録用リンクを受け取ってください
+          （管理者は「管理 &gt; ユーザー管理」で確認できます）。
+        </p>
       `,
     },
     status,

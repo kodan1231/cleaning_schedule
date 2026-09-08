@@ -463,10 +463,14 @@ async function renderUsers(c, extra = {}) {
   }));
   const registrationOpen = (await getMeta(c.env.DB, "registration_open", "1")) === "1";
   const maxUsers = parseInt(await getMeta(c.env.DB, "max_users", "4"), 10) || 4;
+  const inviteUrl = c.env.SETUP_TOKEN
+    ? `${new URL(c.req.url).origin}/register?token=${c.env.SETUP_TOKEN}`
+    : null;
   return userList(c, {
     users,
     registrationOpen,
     maxUsers,
+    inviteUrl,
     msg: c.req.query("msg"),
     ...extra,
   });

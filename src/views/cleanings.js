@@ -3,6 +3,8 @@ import { authedPage } from "./layout.js";
 import { fmtDateJst, fmtDateTimeJst, todayJst } from "../lib/datetime.js";
 import { groupByArea } from "../lib/checklist.js";
 
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
 function csrf(c) {
   return html`<input type="hidden" name="_csrf" value="${c.get("csrf")}" />`;
 }
@@ -49,27 +51,71 @@ function cleaningCard(c, today) {
 }
 
 // ─────────────────────────────────────────────
-// S-02 ダッシュボード
+// S-02 ダッシュボード（月カレンダー）
 // ─────────────────────────────────────────────
-export function dashboardPage(c, { upcoming, recent, properties, selected, msg }) {
-  const today = todayJst();
+export function dashboardPage(c, opts) {
+  const {
+    today,
+    month,
+    prevMonth,
+    nextMonth,
+    weeks,
+    byDate,
+    selectedDay,
+    dayCleanings,
+    overdue,
+    properties,
+    selectedProperty,
+    msg,
+  } = opts;
+  const user = c.get("user");
+  const [y, m] = month.split("-");
+  const pq = selectedProperty ? `&property=${selectedProperty}` : "";
+
+  // その日の状態内訳（ドット用）
+  const marksFor = (date) => {
+    const list = byDate[date] || [];
+    return {
+      count: list.length,
+      pending: list.some((x) => x.status === "pending"),
+      in_progress: list.some((x) => x.status === "in_progress"),
+      done: list.every((x) => x.status === "done") && list.length > 0,
+      anyDone: list.some((x) => x.status === "done"),
+    };
+  };
+
   return authedPage(c, {
     title: "清掃",
     active: "home",
     body: html`
-      <h1>清掃予定</h1>
+      <div class="dash-head">
+        <h1>清掃カレンダー</h1>
+        ${user.role === "admin"
+          ? html`<a class="btn secondary sm" href="/admin">管理メニュー</a>`
+          : raw("")}
+      </div>
       ${flash(msg)}
+
+      ${overdue
+        ? html`
+            <a class="card overdue-banner"
+               href="/?month=${overdue.first.slice(0, 7)}&day=${overdue.first}${pq}">
+              期限切れの未完了清掃が ${overdue.count} 件あります &rsaquo;
+            </a>
+          `
+        : raw("")}
 
       ${properties.length > 1
         ? html`
             <form method="get" action="/" class="card filter">
+              <input type="hidden" name="month" value="${month}" />
               <label class="fld">
                 物件で絞り込み
                 <select name="property" onchange="this.form.submit()">
                   <option value="">すべての物件</option>
                   ${properties.map(
                     (p) => html`
-                      <option value="${p.id}" ${String(selected) === String(p.id) ? "selected" : ""}>
+                      <option value="${p.id}" ${selectedProperty === String(p.id) ? "selected" : ""}>
                         ${p.name}
                       </option>
                     `,
@@ -81,17 +127,54 @@ export function dashboardPage(c, { upcoming, recent, properties, selected, msg }
           `
         : raw("")}
 
+      <div class="cal">
+        <div class="cal-nav">
+          <a class="cal-arrow" href="/?month=${prevMonth}${pq}" aria-label="前の月">&lsaquo;</a>
+          <span class="cal-title">${y}年${Number(m)}月</span>
+          <a class="cal-arrow" href="/?month=${nextMonth}${pq}" aria-label="次の月">&rsaquo;</a>
+        </div>
+        <div class="cal-grid cal-dow">
+          ${WEEKDAYS.map((w, i) => html`<div class="dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</div>`)}
+        </div>
+        ${weeks.map(
+          (week) => html`
+            <div class="cal-grid">
+              ${week.map((cell) => {
+                if (!cell) return html`<div class="cal-cell empty"></div>`;
+                const mk = marksFor(cell.date);
+                const cls = [
+                  "cal-cell",
+                  cell.date === today ? "today" : "",
+                  cell.date === selectedDay ? "sel" : "",
+                  mk.count ? "has" : "",
+                ].join(" ");
+                return html`
+                  <a class="${cls}" href="/?month=${month}&day=${cell.date}${pq}">
+                    <span class="cal-num">${cell.day}</span>
+                    ${mk.count
+                      ? html`
+                          <span class="cal-dots">
+                            ${mk.pending ? html`<i class="dot status-pending"></i>` : raw("")}
+                            ${mk.in_progress ? html`<i class="dot status-in_progress"></i>` : raw("")}
+                            ${mk.anyDone ? html`<i class="dot status-done"></i>` : raw("")}
+                          </span>
+                          <span class="cal-n">${mk.count}</span>
+                        `
+                      : raw("")}
+                  </a>
+                `;
+              })}
+            </div>
+          `,
+        )}
+      </div>
+
+      <h2 class="sub">${fmtDateJst(selectedDay)} の清掃</h2>
+      ${dayCleanings.length === 0
+        ? html`<div class="card muted">この日の清掃はありません。</div>`
+        : html`<div class="clist">${dayCleanings.map((x) => cleaningCard(x, today))}</div>`}
+
       <p><a class="btn secondary" href="/cleanings/new">臨時清掃を追加</a></p>
-
-      <h2 class="sub">今後の清掃</h2>
-      ${upcoming.length === 0
-        ? html`<div class="card muted">直近の清掃予定はありません。</div>`
-        : html`<div class="clist">${upcoming.map((x) => cleaningCard(x, today))}</div>`}
-
-      <h2 class="sub">最近完了した清掃</h2>
-      ${recent.length === 0
-        ? html`<div class="card muted">最近完了した清掃はありません。</div>`
-        : html`<div class="clist">${recent.map((x) => cleaningCard(x, today))}</div>`}
     `,
   });
 }

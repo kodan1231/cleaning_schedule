@@ -416,8 +416,9 @@ function templateItemRow(c, tplId, it, idx, total) {
 // ─────────────────────────────────────────────
 // ユーザー管理
 // ─────────────────────────────────────────────
-export function userList(c, { users, registrationOpen, maxUsers, msg, err, newPin }) {
+export function userList(c, { users, registrationOpen, maxUsers, inviteUrl, msg, err, newPin }) {
   const me = c.get("user");
+  const full = users.length >= maxUsers;
   return authedPage(c, {
     title: "ユーザー",
     active: "admin",
@@ -445,6 +446,24 @@ export function userList(c, { users, registrationOpen, maxUsers, msg, err, newPi
           </button>
         </form>
       </div>
+
+      ${inviteUrl
+        ? html`
+            <div class="card">
+              <h3>メンバーを招待</h3>
+              <p class="muted sm">
+                この URL をチームに共有すると、各自が表示名と PIN を登録できます。
+                ${registrationOpen
+                  ? full
+                    ? html`<br /><strong>現在は上限に達しているため登録できません。</strong>`
+                    : raw("")
+                  : html`<br /><strong>現在は受付停止中です。上の「受付を再開」を押してください。</strong>`}
+              </p>
+              <input class="invite-url mono" type="text" readonly value="${inviteUrl}"
+                onclick="this.select()" />
+            </div>
+          `
+        : raw("")}
 
       <table class="tbl">
         <thead>

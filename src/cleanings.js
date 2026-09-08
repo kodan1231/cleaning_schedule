@@ -4,13 +4,16 @@
 import { Hono } from "hono";
 import { one, all, run } from "./db/queries.js";
 import { requireAuth, verifyCsrf } from "./auth.js";
-import { nowIso, todayJst, addDays } from "./lib/datetime.js";
+import {
+  nowIso,
+  todayJst,
+  addDays,
+  shiftMonth,
+  lastDayOfMonth,
+  monthGrid,
+} from "./lib/datetime.js";
 import { snapshotChecklist } from "./lib/checklist.js";
 import { dashboardPage, cleaningDetailPage, newCleaningPage } from "./views/cleanings.js";
-
-const UPCOMING_PAST_DAYS = 30;
-const UPCOMING_FUTURE_DAYS = 14;
-const RECENT_DAYS = 14;
 
 async function form(c) {
   const body = await c.req.parseBody();
@@ -34,34 +37,51 @@ const CARD_JOINS = `
 `;
 
 // ─────────────────────────────────────────────
-// GET /  ダッシュボード
+// GET /  ダッシュボード（月カレンダー）
 // ─────────────────────────────────────────────
 export async function dashboard(c) {
   const db = c.env.DB;
   const today = todayJst();
-  const selected = c.req.query("property") || "";
-  const propId = /^\d+$/.test(selected) ? parseInt(selected, 10) : null;
+
+  const propRaw = c.req.query("property") || "";
+  const propId = /^\d+$/.test(propRaw) ? parseInt(propRaw, 10) : null;
   const propClause = propId ? " AND c.property_id = ?" : "";
   const propArg = propId ? [propId] : [];
 
-  const upcoming = await all(
+  const mRaw = c.req.query("month") || "";
+  const month = /^\d{4}-\d{2}$/.test(mRaw) ? mRaw : today.slice(0, 7);
+  const monthStart = `${month}-01`;
+  const monthEnd = lastDayOfMonth(month);
+
+  const dRaw = c.req.query("day") || "";
+  const selectedDay =
+    /^\d{4}-\d{2}-\d{2}$/.test(dRaw) && dRaw.slice(0, 7) === month
+      ? dRaw
+      : today.slice(0, 7) === month
+        ? today
+        : monthStart;
+
+  const rows = await all(
     db,
     `SELECT ${CARD_COLS} ${CARD_JOINS}
-     WHERE c.status IN ('pending','in_progress')
+     WHERE c.status != 'cancelled'
        AND c.clean_date BETWEEN ? AND ?${propClause}
      ORDER BY c.clean_date ASC, p.name ASC`,
-    addDays(today, -UPCOMING_PAST_DAYS),
-    addDays(today, UPCOMING_FUTURE_DAYS),
+    monthStart,
+    monthEnd,
     ...propArg,
   );
 
-  const recent = await all(
+  const byDate = {};
+  for (const r of rows) (byDate[r.clean_date] ||= []).push(r);
+
+  // 期限切れ（未完了・過去日）— 当月以外も含めて件数だけ数える
+  const overdue = await one(
     db,
-    `SELECT ${CARD_COLS} ${CARD_JOINS}
-     WHERE c.status = 'done' AND c.clean_date >= ?${propClause}
-     ORDER BY c.completed_at DESC, c.clean_date DESC
-     LIMIT 50`,
-    addDays(today, -RECENT_DAYS),
+    `SELECT COUNT(*) AS n, MIN(c.clean_date) AS first
+       FROM cleaning c
+      WHERE c.status IN ('pending','in_progress') AND c.clean_date < ?${propClause}`,
+    today,
     ...propArg,
   );
 
@@ -70,7 +90,20 @@ export async function dashboard(c) {
     "SELECT id, name FROM property WHERE active = 1 ORDER BY name, id",
   );
 
-  return dashboardPage(c, { upcoming, recent, properties, selected, msg: c.req.query("msg") });
+  return dashboardPage(c, {
+    today,
+    month,
+    prevMonth: shiftMonth(month, -1),
+    nextMonth: shiftMonth(month, 1),
+    weeks: monthGrid(month),
+    byDate,
+    selectedDay,
+    dayCleanings: byDate[selectedDay] || [],
+    overdue: overdue?.n ? { count: overdue.n, first: overdue.first } : null,
+    properties,
+    selectedProperty: propId ? String(propId) : "",
+    msg: c.req.query("msg"),
+  });
 }
 
 // ─────────────────────────────────────────────
