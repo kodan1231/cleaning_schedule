@@ -143,6 +143,21 @@ async function propertyDetailData(c, id, extra = {}) {
      WHERE r.property_id = ? ORDER BY r.sort_order, r.id`,
     id,
   );
+  const roomIds = rooms.map((r) => r.id);
+  const extraByRoom = new Map();
+  if (roomIds.length) {
+    const items = await all(
+      c.env.DB,
+      `SELECT id, room_id, sort_order, label, needs_photo, note FROM room_item
+       WHERE room_id IN (${roomIds.map(() => "?").join(",")}) ORDER BY sort_order, id`,
+      ...roomIds,
+    );
+    for (const it of items) {
+      if (!extraByRoom.has(it.room_id)) extraByRoom.set(it.room_id, []);
+      extraByRoom.get(it.room_id).push(it);
+    }
+  }
+  for (const r of rooms) r.extra = extraByRoom.get(r.id) || [];
   const templates = await loadTemplates(c.env.DB);
   return { p, rooms, templates, msg: c.req.query("msg"), ...extra };
 }
@@ -307,6 +322,104 @@ admin.post("/properties/:id/rooms/:rid/delete", async (c) => {
   if (!body) return badReq(c);
   await run(c.env.DB, "DELETE FROM room WHERE id = ? AND property_id = ?", rid, id);
   return c.redirect(to(`/admin/properties/${id}`, "間取りを削除しました"));
+});
+
+// ── 間取りごとの追加チェック項目（room_item）──
+async function ownedRoom(c, id, rid) {
+  return one(c.env.DB, "SELECT id FROM room WHERE id = ? AND property_id = ?", rid, id);
+}
+
+admin.post("/properties/:id/rooms/:rid/items", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  if (!(await ownedRoom(c, id, rid))) return c.notFound();
+  const { data, errs } = validateItem(body);
+  if (errs.length) return propertyForm(c, await propertyDetailData(c, id, { err: errs.join(" / ") }));
+  const next =
+    (await one(
+      c.env.DB,
+      "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM room_item WHERE room_id = ?",
+      rid,
+    ))?.n || 1;
+  await run(
+    c.env.DB,
+    "INSERT INTO room_item (room_id, sort_order, label, needs_photo, note) VALUES (?, ?, ?, ?, ?)",
+    rid,
+    next,
+    data.label,
+    data.needs_photo,
+    data.note,
+  );
+  return c.redirect(to(`/admin/properties/${id}`, "この部屋の項目を追加しました"));
+});
+
+admin.post("/properties/:id/rooms/:rid/items/:itid", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const itid = parseInt(c.req.param("itid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const it = await one(
+    c.env.DB,
+    "SELECT ri.id FROM room_item ri JOIN room r ON r.id = ri.room_id WHERE ri.id = ? AND ri.room_id = ? AND r.property_id = ?",
+    itid,
+    rid,
+    id,
+  );
+  if (!it) return c.notFound();
+  const { data, errs } = validateItem(body);
+  if (errs.length) return propertyForm(c, await propertyDetailData(c, id, { err: errs.join(" / ") }));
+  await run(
+    c.env.DB,
+    "UPDATE room_item SET label = ?, needs_photo = ?, note = ? WHERE id = ?",
+    data.label,
+    data.needs_photo,
+    data.note,
+    itid,
+  );
+  return c.redirect(to(`/admin/properties/${id}`, "項目を保存しました"));
+});
+
+admin.post("/properties/:id/rooms/:rid/items/:itid/delete", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const itid = parseInt(c.req.param("itid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const it = await one(
+    c.env.DB,
+    "SELECT ri.id FROM room_item ri JOIN room r ON r.id = ri.room_id WHERE ri.id = ? AND ri.room_id = ? AND r.property_id = ?",
+    itid,
+    rid,
+    id,
+  );
+  if (!it) return c.notFound();
+  await run(c.env.DB, "DELETE FROM room_item WHERE id = ?", itid);
+  return c.redirect(to(`/admin/properties/${id}`, "項目を削除しました"));
+});
+
+admin.post("/properties/:id/rooms/:rid/items/:itid/move", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const itid = parseInt(c.req.param("itid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  if (!(await ownedRoom(c, id, rid))) return c.notFound();
+  const dir = body.dir === "down" ? "down" : "up";
+  const siblings = await all(
+    c.env.DB,
+    "SELECT id, sort_order FROM room_item WHERE room_id = ? ORDER BY sort_order, id",
+    rid,
+  );
+  const idx = siblings.findIndex((s) => s.id === itid);
+  const j = dir === "up" ? idx - 1 : idx + 1;
+  if (idx >= 0 && j >= 0 && j < siblings.length) {
+    await run(c.env.DB, "UPDATE room_item SET sort_order = ? WHERE id = ?", siblings[j].sort_order, siblings[idx].id);
+    await run(c.env.DB, "UPDATE room_item SET sort_order = ? WHERE id = ?", siblings[idx].sort_order, siblings[j].id);
+  }
+  return c.redirect(`/admin/properties/${id}`);
 });
 
 admin.post("/properties/:id/toggle", async (c) => {

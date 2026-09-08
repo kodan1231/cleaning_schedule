@@ -244,37 +244,113 @@ export function newPropertyPage(c, { err } = {}) {
 // ─────────────────────────────────────────────
 // 物件詳細（基本情報 + 間取り）
 // ─────────────────────────────────────────────
-function roomRow(c, propertyId, r, templates, idx, total) {
+function extraItemRow(c, propertyId, roomId, it, idx, total) {
+  const base = `/admin/properties/${propertyId}/rooms/${roomId}/items/${it.id}`;
   return html`
-    <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="room-line" data-room-id="${r.id}">
-      ${csrf(c)}
-      <span class="room-grip" aria-hidden="true" title="ドラッグで並べ替え">⠿</span>
-      <input class="room-name" type="text" name="name" value="${r.name}" maxlength="40" required />
-      <select name="template_id" class="room-tpl">
-        <option value="">テンプレ未割当</option>
-        ${templates.map(
-          (t) => html`
-            <option value="${t.id}" ${String(r.template_id) === String(t.id) ? "selected" : ""}>
-              ${t.name}${t.items != null ? html` (${t.items})` : raw("")}
-            </option>
-          `,
-        )}
-      </select>
-      <button type="submit" class="secondary sm" title="保存">保存</button>
-      <span class="room-ops">
-        <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
-          name="dir" value="up" class="linkbtn room-move" ${idx === 0 ? "disabled" : ""}>↑</button>
-        <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
-          name="dir" value="down" class="linkbtn room-move" ${idx === total - 1 ? "disabled" : ""}>↓</button>
-        <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/delete"
-          class="linkbtn danger" onclick="return confirm('この間取りを削除しますか？')">✕</button>
-      </span>
-    </form>
+    <li class="item">
+      <details>
+        <summary>
+          ${it.label}
+          ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
+        </summary>
+        <form method="post" action="${base}" class="form sub-form">
+          ${csrf(c)}
+          <label class="fld">
+            ラベル
+            <input type="text" name="label" value="${it.label}" maxlength="120" required />
+          </label>
+          <label class="fld chk">
+            <input type="checkbox" name="needs_photo" value="1" ${it.needs_photo ? "checked" : ""} />
+            写真の目印をつける
+          </label>
+          <label class="fld">
+            補足
+            <input type="text" name="note" value="${it.note || ""}" maxlength="200" />
+          </label>
+          <button type="submit">保存</button>
+        </form>
+        <div class="row-actions">
+          <form method="post" action="${base}/move" class="inline">
+            ${csrf(c)}
+            <input type="hidden" name="dir" value="up" />
+            <button type="submit" class="secondary" ${idx === 0 ? "disabled" : ""}>↑</button>
+          </form>
+          <form method="post" action="${base}/move" class="inline">
+            ${csrf(c)}
+            <input type="hidden" name="dir" value="down" />
+            <button type="submit" class="secondary" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+          </form>
+          <form method="post" action="${base}/delete" class="inline"
+                onsubmit="return confirm('この項目を削除しますか？')">
+            ${csrf(c)}
+            <button type="submit" class="secondary danger">削除</button>
+          </form>
+        </div>
+      </details>
+    </li>
+  `;
+}
+
+function roomRow(c, propertyId, r, templates, idx, total) {
+  const extra = r.extra || [];
+  return html`
+    <div class="room-admin" data-room-id="${r.id}">
+      <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="room-line">
+        ${csrf(c)}
+        <span class="room-grip" aria-hidden="true" title="ドラッグで並べ替え">⠿</span>
+        <input class="room-name" type="text" name="name" value="${r.name}" maxlength="40" required />
+        <select name="template_id" class="room-tpl">
+          <option value="">テンプレ未割当</option>
+          ${templates.map(
+            (t) => html`
+              <option value="${t.id}" ${String(r.template_id) === String(t.id) ? "selected" : ""}>
+                ${t.name}${t.items != null ? html` (${t.items})` : raw("")}
+              </option>
+            `,
+          )}
+        </select>
+        <button type="submit" class="secondary sm" title="保存">保存</button>
+        <span class="room-ops">
+          <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
+            name="dir" value="up" class="linkbtn room-move" ${idx === 0 ? "disabled" : ""}>↑</button>
+          <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
+            name="dir" value="down" class="linkbtn room-move" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+          <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/delete"
+            class="linkbtn danger" onclick="return confirm('この間取りを削除しますか？')">✕</button>
+        </span>
+      </form>
+      <details class="room-extra">
+        <summary>この部屋だけの項目 <span class="muted sm">(${extra.length})</span></summary>
+        <div class="room-extra-body">
+          ${extra.length
+            ? html`<ul class="items">
+                ${extra.map((it, i) => extraItemRow(c, propertyId, r.id, it, i, extra.length))}
+              </ul>`
+            : html`<p class="muted sm">共有テンプレに含めない、この部屋だけの項目をここに追加できます。</p>`}
+          <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/items" class="form sub-form">
+            ${csrf(c)}
+            <label class="fld">
+              ラベル
+              <input type="text" name="label" maxlength="120" placeholder="例: 窓の結露を拭く" required />
+            </label>
+            <label class="fld chk">
+              <input type="checkbox" name="needs_photo" value="1" />
+              写真の目印をつける
+            </label>
+            <label class="fld">
+              補足（任意）
+              <input type="text" name="note" maxlength="200" />
+            </label>
+            <button type="submit" class="secondary">項目を追加</button>
+          </form>
+        </div>
+      </details>
+    </div>
   `;
 }
 
 export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
-  const roomsMissingTpl = rooms.filter((r) => !r.template_id).length;
+  const roomsMissingTpl = rooms.filter((r) => !r.template_id && !(r.extra && r.extra.length)).length;
   return authedPage(c, {
     title: p.name,
     active: "admin",
@@ -291,7 +367,8 @@ export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
       <h2 class="sub">間取り <span class="muted sm">${rooms.length} 室</span></h2>
       <p class="muted sm">
         部屋ごとにチェックテンプレートを割り当てます。清掃はこれらをまとめて生成されます。
-        ${roomsMissingTpl ? html`<br /><strong style="color:var(--orange)">テンプレ未割当の間取りが ${roomsMissingTpl} 室あります。</strong>` : raw("")}
+        テンプレに含めない部屋固有の項目は、各行の「＋ この部屋だけの項目」から追加できます。
+        ${roomsMissingTpl ? html`<br /><strong style="color:var(--orange)">項目が未設定の間取りが ${roomsMissingTpl} 室あります（テンプレも追加項目もなし）。</strong>` : raw("")}
       </p>
 
       <div class="card room-list" data-reorder-url="/admin/properties/${p.id}/rooms/reorder">

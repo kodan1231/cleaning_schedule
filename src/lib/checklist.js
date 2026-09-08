@@ -1,9 +1,11 @@
 // チェックリスト関連の共有ヘルパ。
 
 import { all, run } from "../db/queries.js";
+import { itemKey } from "./ids.js";
 
 /**
- * 物件の全間取りのテンプレ項目を checklist_item にコピーする（スナップショット）。
+ * 物件の全間取りのチェック項目を checklist_item にコピーする（スナップショット）。
+ * 各間取りで〈共有テンプレの項目 → その間取り固有の追加項目（room_item）〉の順に展開する。
  * cleaning 生成時（iCal 同期・臨時清掃）に呼ぶ。以後テンプレ・間取り変更の影響を受けない。
  * @returns コピーした項目数
  */
@@ -15,34 +17,49 @@ export async function snapshotChecklist(db, cleaningId, propertyId) {
   );
   let n = 0;
   for (const room of rooms) {
-    if (!room.template_id) continue;
-    const items = await all(
-      db,
-      `SELECT sort_order, item_key, label, needs_photo, note
-         FROM checklist_template_item
-        WHERE template_id = ?
-        ORDER BY sort_order, id`,
-      room.template_id,
-    );
-    for (const it of items) {
-      await run(
+    let order = 0; // 間取り内の連番（テンプレ項目→追加項目で通し）
+    if (room.template_id) {
+      const items = await all(
         db,
-        `INSERT INTO checklist_item
-           (cleaning_id, room_name, room_sort, sort_order, item_key, label, needs_photo, note, checked)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        cleaningId,
-        room.name,
-        room.sort_order,
-        it.sort_order,
-        it.item_key,
-        it.label,
-        it.needs_photo,
-        it.note,
+        `SELECT item_key, label, needs_photo, note
+           FROM checklist_template_item
+          WHERE template_id = ?
+          ORDER BY sort_order, id`,
+        room.template_id,
       );
+      for (const it of items) {
+        await insertItem(db, cleaningId, room, order++, it.item_key, it);
+        n++;
+      }
+    }
+    const extra = await all(
+      db,
+      `SELECT label, needs_photo, note FROM room_item WHERE room_id = ? ORDER BY sort_order, id`,
+      room.id,
+    );
+    for (const it of extra) {
+      await insertItem(db, cleaningId, room, order++, itemKey(), it);
       n++;
     }
   }
   return n;
+}
+
+async function insertItem(db, cleaningId, room, sortOrder, key, it) {
+  await run(
+    db,
+    `INSERT INTO checklist_item
+       (cleaning_id, room_name, room_sort, sort_order, item_key, label, needs_photo, note, checked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    cleaningId,
+    room.name,
+    room.sort_order,
+    sortOrder,
+    key,
+    it.label,
+    it.needs_photo,
+    it.note,
+  );
 }
 
 /**

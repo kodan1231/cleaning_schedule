@@ -135,7 +135,7 @@ function initRoomSort() {
   wrap.addEventListener("pointerdown", (e) => {
     const grip = e.target.closest(".room-grip");
     if (!grip) return;
-    const row = grip.closest(".room-line");
+    const row = grip.closest(".room-admin");
     if (!row) return;
     e.preventDefault();
     dragging = row;
@@ -148,7 +148,7 @@ function initRoomSort() {
   wrap.addEventListener("pointermove", (e) => {
     if (!dragging) return;
     e.preventDefault();
-    const rows = [...wrap.querySelectorAll(".room-line:not(.dragging)")];
+    const rows = [...wrap.querySelectorAll(".room-admin:not(.dragging)")];
     const after = rows.find((r) => {
       const box = r.getBoundingClientRect();
       return e.clientY < box.top + box.height / 2;
@@ -161,7 +161,7 @@ function initRoomSort() {
     if (!dragging) return;
     dragging.classList.remove("dragging");
     dragging = null;
-    const order = [...wrap.querySelectorAll(".room-line")]
+    const order = [...wrap.querySelectorAll(".room-admin")]
       .map((r) => r.dataset.roomId)
       .join(",");
     try {

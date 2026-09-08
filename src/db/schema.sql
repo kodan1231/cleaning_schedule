@@ -70,6 +70,18 @@ CREATE TABLE IF NOT EXISTS room (
 );
 CREATE INDEX IF NOT EXISTS idx_room_property ON room(property_id, sort_order);
 
+-- 間取りごとの追加チェック項目（共有テンプレに含めない部屋固有の項目。マイグレーション 0005）
+--   清掃生成時に〈テンプレ項目 → room_item〉の順で checklist_item に展開される。
+CREATE TABLE IF NOT EXISTS room_item (
+  id          INTEGER PRIMARY KEY,
+  room_id     INTEGER NOT NULL REFERENCES room(id) ON DELETE CASCADE,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  label       TEXT    NOT NULL,
+  needs_photo INTEGER NOT NULL DEFAULT 0,
+  note        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_room_item_room ON room_item(room_id, sort_order);
+
 -- ─────────────────────────────────────────────
 -- 予約（iCal 同期結果）
 -- ─────────────────────────────────────────────
@@ -200,7 +212,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '4');
+  ('schema_version', '5');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)

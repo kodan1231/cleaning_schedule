@@ -212,6 +212,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 
 /* 間取り（コンパクト行・1行に収める） */
 .room-list { display: flex; flex-direction: column; gap: 6px; }
+.room-admin { border-top: 1px solid var(--line); }
+.room-sortable > .room-admin:first-child { border-top: none; }
 .room-line {
   display: flex;
   flex-wrap: nowrap;
@@ -219,9 +221,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   gap: 4px;
   margin: 0;
   padding: 6px 0;
-  border-top: 1px solid var(--line);
 }
-.room-list .room-line:first-child { border-top: none; }
 .room-line.room-add { border-top: 2px solid var(--line); padding-top: 10px; margin-top: 4px; }
 .room-line .room-name { flex: 1 1 34%; min-width: 0; font: inherit; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); }
 .room-tpl { flex: 2 1 40%; min-width: 0; font: inherit; padding: 7px 4px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); }
@@ -244,7 +244,23 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 }
 .no-js .room-grip { display: none; }
 .js .room-move { display: none; }
-.room-line.dragging { opacity: 0.6; background: #eef6f1; border-radius: 8px; }
+.room-admin.dragging { opacity: 0.6; background: #eef6f1; border-radius: 8px; }
+
+/* 間取りごとの追加項目 */
+.room-extra { margin: 0 0 4px 22px; }
+.room-extra > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 2px 0 6px;
+}
+.room-extra > summary::-webkit-details-marker { display: none; }
+.room-extra > summary::before { content: "＋ "; }
+.room-extra[open] > summary::before { content: "− "; }
+.room-extra-body { padding: 4px 0 8px; }
+.room-extra-body .items { margin-bottom: 8px; }
+.room-extra-body .sub-form { margin: 0; }
 .linkbtn {
   background: none;
   border: 1px solid var(--line);
