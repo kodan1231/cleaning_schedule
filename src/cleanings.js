@@ -246,6 +246,21 @@ cleanings.post("/:id/note", async (c) => {
   return c.redirect(to(`/cleanings/${id}`, "メモを保存しました"));
 });
 
+// ── 清掃の削除（admin のみ。iCal 由来は次回同期で再作成される）──
+cleanings.post("/:id/delete", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  if (c.get("user").role !== "admin") return c.text("Forbidden", 403);
+  const cl = await one(c.env.DB, "SELECT id FROM cleaning WHERE id = ?", id);
+  if (!cl) return c.notFound();
+  await run(c.env.DB, "DELETE FROM checklist_item WHERE cleaning_id = ?", id);
+  await run(c.env.DB, "DELETE FROM photo_blob WHERE photo_id IN (SELECT id FROM photo WHERE cleaning_id = ?)", id);
+  await run(c.env.DB, "DELETE FROM photo WHERE cleaning_id = ?", id);
+  await run(c.env.DB, "DELETE FROM cleaning WHERE id = ?", id);
+  return c.redirect(to("/", "清掃を削除しました"));
+});
+
 // ── チェック項目のトグル（FR-16）──
 cleanings.post("/:id/items/:iid/toggle", async (c) => {
   const id = parseInt(c.req.param("id"), 10);

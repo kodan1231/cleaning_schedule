@@ -181,8 +181,6 @@ button.danger, .btn.danger { border-color: #d9534f; color: #b02a24; }
 button[disabled] { opacity: 0.4; cursor: not-allowed; }
 
 /* 清掃カード / 詳細 */
-.dash-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.dash-head h1 { margin: 4px 0 12px; }
 .invite-url {
   width: 100%;
   font-size: 12px;
@@ -192,6 +190,20 @@ button[disabled] { opacity: 0.4; cursor: not-allowed; }
   background: #fafbfc;
   color: var(--text);
 }
+
+.user-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.form-row { display: flex; gap: 6px; margin: 8px 0; }
+.form-row input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+.form-row button { flex: none; }
 .filter { padding: 12px 14px; }
 .filter .fld { margin: 0; }
 

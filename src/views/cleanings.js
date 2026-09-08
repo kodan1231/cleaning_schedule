@@ -68,7 +68,6 @@ export function dashboardPage(c, opts) {
     selectedProperty,
     msg,
   } = opts;
-  const user = c.get("user");
   const [y, m] = month.split("-");
   const pq = selectedProperty ? `&property=${selectedProperty}` : "";
 
@@ -88,12 +87,7 @@ export function dashboardPage(c, opts) {
     title: "清掃",
     active: "home",
     body: html`
-      <div class="dash-head">
-        <h1>清掃カレンダー</h1>
-        ${user.role === "admin"
-          ? html`<a class="btn secondary sm" href="/admin">管理メニュー</a>`
-          : raw("")}
-      </div>
+      <h1>清掃カレンダー</h1>
       ${flash(msg)}
 
       ${overdue
@@ -188,6 +182,7 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
   const doneN = items.filter((i) => i.checked).length;
   const incomplete = total - doneN;
   const editable = cl.status !== "cancelled";
+  const isAdmin = c.get("user").role === "admin";
 
   return authedPage(c, {
     title: cl.property_name,
@@ -251,6 +246,22 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
           )}
       ${total && !editable
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
+        : raw("")}
+
+      ${isAdmin
+        ? html`
+            <form method="post" action="/cleanings/${cl.id}/delete" class="card"
+                  onsubmit="return confirm('この清掃を削除します。よろしいですか？')">
+              ${csrf(c)}
+              <p class="muted sm">
+                この清掃を削除します（チェック状態・写真も消えます）。
+                ${cl.source === "manual"
+                  ? raw("")
+                  : "iCal 予約由来のため、次回の同期で現在のテンプレートを使って作り直されます。"}
+              </p>
+              <button type="submit" class="secondary danger">この清掃を削除</button>
+            </form>
+          `
         : raw("")}
     `,
   });

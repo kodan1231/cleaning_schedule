@@ -6,7 +6,7 @@ import { page } from "./views/layout.js";
 import { loginPage, registerPage } from "./views/auth.js";
 import { admin } from "./admin.js";
 import { dashboard, cleanings } from "./cleanings.js";
-import { one, all, run, getMeta, setMeta, ping } from "./db/queries.js";
+import { one, all, run, getMeta, ping } from "./db/queries.js";
 import {
   hashPin,
   verifyPin,
@@ -42,10 +42,8 @@ app.get("/healthz", async (c) => {
 // 登録
 // ─────────────────────────────────────────────
 async function registrationClosed(db) {
-  if ((await getMeta(db, "registration_open", "1")) !== "1") return true;
-  const cnt = await one(db, "SELECT COUNT(*) AS c FROM user");
-  const max = parseInt(await getMeta(db, "max_users", "4"), 10) || 4;
-  return (cnt?.c || 0) >= max;
+  // 人数上限は設けない。admin が /admin/users で受付を停止したときだけ閉じる。
+  return (await getMeta(db, "registration_open", "1")) !== "1";
 }
 
 app.get("/register", async (c) => {
@@ -115,9 +113,6 @@ app.post("/register", async (c) => {
     }
     throw e;
   }
-
-  const max = parseInt(await getMeta(c.env.DB, "max_users", "4"), 10) || 4;
-  if (count + 1 >= max) await setMeta(c.env.DB, "registration_open", "0");
 
   setSessionCookie(c, await signSession(c.env.SESSION_SECRET, { uid, role }));
   return c.redirect("/");

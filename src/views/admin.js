@@ -416,9 +416,8 @@ function templateItemRow(c, tplId, it, idx, total) {
 // ─────────────────────────────────────────────
 // ユーザー管理
 // ─────────────────────────────────────────────
-export function userList(c, { users, registrationOpen, maxUsers, inviteUrl, msg, err, newPin }) {
+export function userList(c, { users, registrationOpen, inviteUrl, msg, err, newPin }) {
   const me = c.get("user");
-  const full = users.length >= maxUsers;
   return authedPage(c, {
     title: "ユーザー",
     active: "admin",
@@ -436,7 +435,7 @@ export function userList(c, { users, registrationOpen, maxUsers, inviteUrl, msg,
       <div class="card">
         <p class="muted">
           登録受付: <strong>${registrationOpen ? "受付中" : "停止中"}</strong>
-          （上限 ${maxUsers} 名 / 現在 ${users.length} 名）
+          （現在 ${users.length} 名・人数上限なし）
         </p>
         <form method="post" action="/admin/registration" class="inline">
           ${csrf(c)}
@@ -454,9 +453,7 @@ export function userList(c, { users, registrationOpen, maxUsers, inviteUrl, msg,
               <p class="muted sm">
                 この URL をチームに共有すると、各自が表示名と PIN を登録できます。
                 ${registrationOpen
-                  ? full
-                    ? html`<br /><strong>現在は上限に達しているため登録できません。</strong>`
-                    : raw("")
+                  ? raw("")
                   : html`<br /><strong>現在は受付停止中です。上の「受付を再開」を押してください。</strong>`}
               </p>
               <input class="invite-url mono" type="text" readonly value="${inviteUrl}"
@@ -465,46 +462,44 @@ export function userList(c, { users, registrationOpen, maxUsers, inviteUrl, msg,
           `
         : raw("")}
 
-      <table class="tbl">
-        <thead>
-          <tr><th>名前</th><th>権限</th><th>状態</th><th>操作</th></tr>
-        </thead>
-        <tbody>
-          ${users.map(
-            (u) => html`
-              <tr class="${u.active ? "" : "row-off"}">
-                <td>
-                  ${u.name}
-                  ${u.id === me.id ? html`<span class="badge">自分</span>` : raw("")}
-                  ${u.locked ? html`<span class="badge photo">ロック中</span>` : raw("")}
-                </td>
-                <td>${u.role === "admin" ? "管理者" : "メンバー"}</td>
-                <td>${u.active ? "有効" : html`<span class="muted">無効</span>`}</td>
-                <td class="row-actions">
-                  <form method="post" action="/admin/users/${u.id}/role" class="inline">
-                    ${csrf(c)}
-                    <input type="hidden" name="role" value="${u.role === "admin" ? "member" : "admin"}" />
-                    <button type="submit" class="secondary sm">
-                      ${u.role === "admin" ? "メンバーへ" : "管理者へ"}
-                    </button>
-                  </form>
-                  <form method="post" action="/admin/users/${u.id}/toggle" class="inline">
-                    ${csrf(c)}
-                    <button type="submit" class="secondary sm" ${u.id === me.id ? "disabled" : ""}>
-                      ${u.active ? "無効化" : "有効化"}
-                    </button>
-                  </form>
-                  <form method="post" action="/admin/users/${u.id}/reset-pin" class="inline"
-                        onsubmit="return confirm('${u.name} の PIN をリセットしますか？')">
-                    ${csrf(c)}
-                    <button type="submit" class="secondary sm">PINリセット</button>
-                  </form>
-                </td>
-              </tr>
-            `,
-          )}
-        </tbody>
-      </table>
+      ${users.map(
+        (u) => html`
+          <div class="card user-row ${u.active ? "" : "row-off"}">
+            <div class="user-head">
+              <strong>${u.name}</strong>
+              ${u.id === me.id ? html`<span class="badge">自分</span>` : raw("")}
+              <span class="badge">${u.role === "admin" ? "管理者" : "メンバー"}</span>
+              ${u.active ? raw("") : html`<span class="badge">無効</span>`}
+              ${u.locked ? html`<span class="badge photo">ロック中</span>` : raw("")}
+            </div>
+            <form method="post" action="/admin/users/${u.id}/name" class="form-row">
+              ${csrf(c)}
+              <input type="text" name="name" value="${u.name}" maxlength="30" required />
+              <button type="submit" class="secondary sm">名前を変更</button>
+            </form>
+            <div class="row-actions">
+              <form method="post" action="/admin/users/${u.id}/role" class="inline">
+                ${csrf(c)}
+                <input type="hidden" name="role" value="${u.role === "admin" ? "member" : "admin"}" />
+                <button type="submit" class="secondary sm">
+                  ${u.role === "admin" ? "メンバーにする" : "管理者にする"}
+                </button>
+              </form>
+              <form method="post" action="/admin/users/${u.id}/toggle" class="inline">
+                ${csrf(c)}
+                <button type="submit" class="secondary sm" ${u.id === me.id ? "disabled" : ""}>
+                  ${u.active ? "無効化" : "有効化"}
+                </button>
+              </form>
+              <form method="post" action="/admin/users/${u.id}/reset-pin" class="inline"
+                    onsubmit="return confirm('${u.name} の PIN をリセットしますか？')">
+                ${csrf(c)}
+                <button type="submit" class="secondary sm">PINリセット</button>
+              </form>
+            </div>
+          </div>
+        `,
+      )}
     `,
   });
 }

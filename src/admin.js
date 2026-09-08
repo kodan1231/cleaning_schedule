@@ -462,14 +462,12 @@ async function renderUsers(c, extra = {}) {
     locked: !!u.locked_until && u.locked_until > nowT,
   }));
   const registrationOpen = (await getMeta(c.env.DB, "registration_open", "1")) === "1";
-  const maxUsers = parseInt(await getMeta(c.env.DB, "max_users", "4"), 10) || 4;
   const inviteUrl = c.env.SETUP_TOKEN
     ? `${new URL(c.req.url).origin}/register?token=${c.env.SETUP_TOKEN}`
     : null;
   return userList(c, {
     users,
     registrationOpen,
-    maxUsers,
     inviteUrl,
     msg: c.req.query("msg"),
     ...extra,
@@ -481,6 +479,27 @@ async function activeAdminCount(db) {
 }
 
 admin.get("/users", (c) => renderUsers(c));
+
+admin.post("/users/:id/name", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const target = await one(c.env.DB, "SELECT id FROM user WHERE id = ?", id);
+  if (!target) return c.notFound();
+  const name = String(body.name || "").trim();
+  if (name.length < 1 || name.length > 30) {
+    return renderUsers(c, { err: "表示名は1〜30文字で入力してください" });
+  }
+  const clash = await one(
+    c.env.DB,
+    "SELECT id FROM user WHERE name = ? AND id <> ?",
+    name,
+    id,
+  );
+  if (clash) return renderUsers(c, { err: "その表示名は既に使われています" });
+  await run(c.env.DB, "UPDATE user SET name = ? WHERE id = ?", name, id);
+  return c.redirect(to("/admin/users", "表示名を変更しました"));
+});
 
 admin.post("/users/:id/role", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
