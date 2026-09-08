@@ -456,6 +456,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .room-block[open] > .room-sum::before { content: "▾"; }
 .room-block[open] > .room-sum { border-bottom: 1px solid var(--line); }
 .room-name { font-weight: 700; }
+.room-done { color: var(--green); font-weight: 700; }
+.room-done::after { content: " ✓"; }
 
 /* チェック項目（コンパクト） */
 .items { list-style: none; margin: 0; padding: 0; }

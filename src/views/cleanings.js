@@ -253,8 +253,6 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
           : raw("")}
       </div>
 
-      ${statusActions(c, cl, incomplete)}
-
       <form method="post" action="/cleanings/${cl.id}/note" class="card form">
         ${csrf(c)}
         <label class="fld">
@@ -263,6 +261,8 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
         </label>
         <button type="submit" class="secondary">メモを保存</button>
       </form>
+
+      ${statusActions(c, cl, incomplete)}
 
       <h2 class="sub">
         チェックリスト
@@ -275,8 +275,7 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
         : groupByFloor(rooms).map((section) =>
             section.group
               ? html`
-                  <details class="floor" ${section.done < section.total ? "open" : ""}
-                           data-floor="${section.group}">
+                  <details class="floor" data-floor="${section.group}">
                     <summary class="floor-sum">
                       <span>${section.group}</span>
                       <span class="muted sm" data-floor-prog="${section.group}">
@@ -340,12 +339,13 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
 }
 
 function roomBlock(c, cl, r, editable, photosByItem) {
-  const complete = r.total > 0 && r.done === r.total;
+  // 初期表示は折り畳み。作業する部屋を開いてもらう。
   return html`
-    <details class="card room-block" ${complete ? "" : "open"} data-room-block="${r.name}">
+    <details class="card room-block" data-room-block="${r.name}">
       <summary class="room-sum">
         <span class="room-name">${r.name}</span>
-        <span class="muted sm" data-room-prog="${r.name}">${r.done}/${r.total}</span>
+        <span class="muted sm ${r.total > 0 && r.done === r.total ? "room-done" : ""}"
+              data-room-prog="${r.name}">${r.done}/${r.total}</span>
       </summary>
       <ul class="items">
         ${r.items.map((it) => checkItem(c, cl, it, editable, photosByItem.get(it.id) || []))}

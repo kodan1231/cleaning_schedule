@@ -57,18 +57,20 @@ document.addEventListener("submit", async (ev) => {
     }
 
     // 進捗
+    const roomDone = data.room.total > 0 && data.room.done === data.room.total;
     const roomEl = document.querySelector(
       `[data-room-prog="${cssEscape(data.room.name)}"]`,
     );
-    if (roomEl) roomEl.textContent = `${data.room.done}/${data.room.total}`;
+    if (roomEl) {
+      roomEl.textContent = `${data.room.done}/${data.room.total}`;
+      roomEl.classList.toggle("room-done", roomDone);
+    }
     const overallEl = document.querySelector("[data-overall]");
     if (overallEl) overallEl.textContent = `${data.overall.done}/${data.overall.total}`;
 
-    // 全部チェック済みの間取りは自動で閉じる
+    // 全部チェック済みの間取りは自動で閉じる（未完了に戻ったら開いたまま）
     const block = li.closest(".room-block");
-    if (block && data.room.total > 0) {
-      block.open = !(data.room.done === data.room.total);
-    }
+    if (block && roomDone) block.open = false;
     // 階の進捗と自動折りたたみ
     const floor = block && block.closest(".floor");
     if (floor) {
