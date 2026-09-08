@@ -6,10 +6,12 @@ import { one, all, run, getMeta, setMeta } from "./db/queries.js";
 import { requireAuth, requireAdmin, verifyCsrf, hashPin } from "./auth.js";
 import { itemKey, randomPin } from "./lib/ids.js";
 import { nowIso } from "./lib/datetime.js";
+import { resnapshotPending } from "./lib/checklist.js";
 import { syncProperty, runScheduledSync } from "./ical/sync.js";
 import {
   adminHome,
   propertyList,
+  newPropertyPage,
   propertyForm,
   templateList,
   templateEditor,
@@ -79,7 +81,7 @@ admin.post("/properties/:id/sync", async (c) => {
   }));
   const msg =
     r.result === "ok"
-      ? `同期しました（予約 ${r.seen} / 生成 ${r.created} / 更新 ${r.updated} / キャンセル ${r.cancelled}）`
+      ? `同期しました（予約 ${r.seen} / 生成 ${r.created} / 更新 ${r.updated} / キャンセル ${r.cancelled} / チェックリスト更新 ${r.refreshed || 0}）`
       : `同期エラー: ${r.message}`;
   return c.redirect(to("/admin", msg));
 });
@@ -99,13 +101,22 @@ admin.post("/sync-all", async (c) => {
 admin.get("/properties", async (c) => {
   const properties = await all(
     c.env.DB,
-    "SELECT id, name, ical_url, active FROM property ORDER BY active DESC, id",
+    `SELECT p.id, p.name, p.active,
+       (SELECT COUNT(*) FROM room r WHERE r.property_id = p.id) AS room_count
+     FROM property p ORDER BY p.active DESC, p.id`,
   );
   return propertyList(c, { properties, msg: c.req.query("msg") });
 });
 
+admin.get("/properties/new", (c) => newPropertyPage(c));
+
 async function loadTemplates(db) {
-  return all(db, "SELECT id, name FROM checklist_template ORDER BY name, id");
+  return all(
+    db,
+    `SELECT t.id, t.name,
+       (SELECT COUNT(*) FROM checklist_template_item i WHERE i.template_id = t.id) AS items
+     FROM checklist_template t ORDER BY t.name, t.id`,
+  );
 }
 
 function validateProperty(body) {
@@ -140,7 +151,7 @@ admin.post("/properties", async (c) => {
   const body = await form(c);
   if (!body) return badReq(c);
   const { data, errs } = validateProperty(body);
-  if (errs.length) return propertyForm(c, { p: null, err: errs.join(" / ") });
+  if (errs.length) return newPropertyPage(c, { err: errs.join(" / ") });
   const meta = await run(
     c.env.DB,
     `INSERT INTO property (name, ical_url, active, checkout_time, note, created_at)
@@ -184,6 +195,19 @@ admin.post("/properties/:id", async (c) => {
     id,
   );
   return c.redirect(to(`/admin/properties/${id}`, "保存しました"));
+});
+
+// ── チェックリストの再生成（未完了の清掃を現テンプレで作り直す）──
+admin.post("/properties/:id/resnapshot", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const p = await one(c.env.DB, "SELECT id FROM property WHERE id = ?", id);
+  if (!p) return c.notFound();
+  const done = await resnapshotPending(c.env.DB, id, { force: true, includeInProgress: true });
+  return c.redirect(
+    to(`/admin/properties/${id}`, `${done.length} 件の清掃のチェックリストを再生成しました`),
+  );
 });
 
 // ── 間取り（部屋）──

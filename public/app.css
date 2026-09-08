@@ -192,8 +192,53 @@ button[disabled] { opacity: 0.4; cursor: not-allowed; }
 }
 
 .user-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.room-row .form { margin-bottom: 8px; }
-.room-row .row-actions { margin-top: 0; }
+.dash-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dash-head h1 { margin: 4px 0 12px; }
+
+/* ダイアログ */
+dialog {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  max-width: 460px;
+  width: calc(100% - 28px);
+  background: var(--card);
+  color: var(--text);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.dialog-form { padding: 18px; margin: 0; }
+.dialog-form h2 { margin: 0 0 4px; font-size: 17px; }
+.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.dialog-actions button { align-self: auto; }
+
+/* 間取り（コンパクト行） */
+.room-list { display: flex; flex-direction: column; gap: 6px; }
+.room-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.room-list .room-line:first-child { border-top: none; }
+.room-line.room-add { border-top: 2px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.room-name { flex: 1 1 40%; min-width: 110px; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); }
+.room-tpl { flex: 1 1 40%; min-width: 120px; font: inherit; padding: 8px 6px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); }
+.room-line button.sm, .room-line button.secondary { flex: none; }
+.room-ops { display: inline-flex; gap: 2px; margin-left: auto; }
+.linkbtn {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  min-height: 32px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.linkbtn.danger { color: #b02a24; border-color: #e6b3b0; }
+.linkbtn[disabled] { opacity: 0.35; }
 .form-row { display: flex; gap: 6px; margin: 8px 0; }
 .form-row input {
   flex: 1;

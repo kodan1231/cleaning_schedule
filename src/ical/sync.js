@@ -4,7 +4,7 @@
 
 import { all, one, run } from "../db/queries.js";
 import { nowIso, todayJst, addDays } from "../lib/datetime.js";
-import { snapshotChecklist } from "../lib/checklist.js";
+import { snapshotChecklist, resnapshotPending } from "../lib/checklist.js";
 import { parseEvents, classifyEvent } from "./parser.js";
 
 const UA = "cleaning-schedule/1.0 (+https://cleaning-schedule.kodan1231.workers.dev)";
@@ -141,15 +141,27 @@ export async function syncProperty(env, propertyId) {
     }
   }
 
+  // 未着手・チェック未着手の清掃は、現在の間取り／テンプレでチェックリストを取り込み直す
+  const refreshed = (await resnapshotPending(db, propertyId)).length;
+
   const note =
     [
       cancelled ? `${cancelled}件キャンセル` : null,
       updated ? `${updated}件日程変更` : null,
+      refreshed ? `${refreshed}件チェックリスト更新` : null,
     ]
       .filter(Boolean)
       .join(" / ") || null;
   await writeLog(db, propertyId, "ok", reservations.length, created, updated + cancelled, note);
-  return { propertyId, result: "ok", seen: reservations.length, created, updated, cancelled };
+  return {
+    propertyId,
+    result: "ok",
+    seen: reservations.length,
+    created,
+    updated,
+    cancelled,
+    refreshed,
+  };
 }
 
 // ───────────────────────── 取得 ─────────────────────────

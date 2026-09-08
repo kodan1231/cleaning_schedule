@@ -104,6 +104,24 @@ function cssEscape(s) {
   return String(s).replace(/["\\]/g, "\\$&");
 }
 
+// ── ダイアログ（JS 有効時は data-dialog リンクでモーダルを開く）──
+document.addEventListener("click", (ev) => {
+  const opener = ev.target.closest("a[data-dialog]");
+  if (opener) {
+    const dlg = document.getElementById(opener.dataset.dialog);
+    if (dlg && typeof dlg.showModal === "function") {
+      ev.preventDefault();
+      dlg.showModal();
+    }
+    return;
+  }
+  const closer = ev.target.closest("dialog [data-close]");
+  if (closer) {
+    ev.preventDefault();
+    closer.closest("dialog").close();
+  }
+});
+
 // ── 写真アップロード（クライアント縮小 → fetch）──
 document.addEventListener("change", async (ev) => {
   const input = ev.target;

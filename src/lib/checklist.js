@@ -45,6 +45,31 @@ export async function snapshotChecklist(db, cleaningId, propertyId) {
   return n;
 }
 
+/**
+ * 未着手/作業中の清掃のチェックリストを現在の間取り・テンプレで作り直す。
+ * チェック済みが1件でもある清掃は、force が false のときスキップ（作業内容を守る）。
+ * @returns 作り直した清掃 id の配列
+ */
+export async function resnapshotPending(db, propertyId, { force = false, includeInProgress = false } = {}) {
+  const statuses = includeInProgress ? "('pending','in_progress')" : "('pending')";
+  const cleanings = await all(
+    db,
+    `SELECT id FROM cleaning WHERE property_id = ? AND status IN ${statuses}`,
+    propertyId,
+  );
+  const done = [];
+  for (const cl of cleanings) {
+    const checked =
+      (await all(db, "SELECT 1 FROM checklist_item WHERE cleaning_id = ? AND checked = 1 LIMIT 1", cl.id))
+        .length > 0;
+    if (checked && !force) continue;
+    await run(db, "DELETE FROM checklist_item WHERE cleaning_id = ?", cl.id);
+    await snapshotChecklist(db, cl.id, propertyId);
+    done.push(cl.id);
+  }
+  return done;
+}
+
 /** checklist_item を間取り別にまとめる。[{ name, items:[...] }]（room_sort 順） */
 export function groupByRoom(items) {
   const map = new Map();

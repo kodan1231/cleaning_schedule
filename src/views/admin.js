@@ -25,12 +25,6 @@ function fmtBytes(n) {
   return `${(n / 1e9).toFixed(2)} GB`;
 }
 
-/** iCal URL のマスク表示（一覧用。実値は編集フォームでのみ表示） */
-export function maskUrl(u) {
-  const s = String(u || "");
-  if (s.length <= 16) return "••••••••";
-  return s.slice(0, 12) + "…" + s.slice(-6);
-}
 
 // ─────────────────────────────────────────────
 // 管理トップ
@@ -155,28 +149,57 @@ export function adminHome(c, { counts, properties, syncLogs = [], storage, msg }
 // ─────────────────────────────────────────────
 // 物件一覧
 // ─────────────────────────────────────────────
+function propertyFields(c, p = {}) {
+  return html`
+    ${csrf(c)}
+    <label class="fld">
+      物件名
+      <input type="text" name="name" value="${p.name || ""}" maxlength="60" required />
+    </label>
+    <label class="fld">
+      iCal URL（Airbnb カレンダー）
+      <input type="url" name="ical_url" value="${p.ical_url || ""}" maxlength="500" required />
+    </label>
+    <label class="fld">
+      チェックアウト時刻
+      <input type="time" name="checkout_time" value="${p.checkout_time || "10:00"}" required />
+    </label>
+    <label class="fld">
+      メモ（任意）
+      <textarea name="note" rows="2" maxlength="500">${p.note || ""}</textarea>
+    </label>
+  `;
+}
+
 export function propertyList(c, { properties, msg }) {
   return authedPage(c, {
     title: "物件",
     active: "admin",
     body: html`
       ${backLink("/admin", "管理メニュー")}
-      <h1>物件</h1>
+      <div class="dash-head">
+        <h1>物件</h1>
+        <a class="btn sm" href="/admin/properties/new" data-dialog="new-prop">＋ 物件を登録</a>
+      </div>
       ${flash(msg)}
 
       ${properties.length === 0
-        ? html`<div class="card muted">まだ物件がありません。</div>`
+        ? html`<div class="card muted">まだ物件がありません。「＋ 物件を登録」から追加してください。</div>`
         : html`
             <table class="tbl">
               <thead>
-                <tr><th>物件名</th><th>iCal URL</th><th>状態</th></tr>
+                <tr><th>物件名</th><th>間取り</th><th>状態</th></tr>
               </thead>
               <tbody>
                 ${properties.map(
                   (p) => html`
                     <tr class="${p.active ? "" : "row-off"}">
                       <td><a href="/admin/properties/${p.id}">${p.name}</a></td>
-                      <td class="mono sm">${maskUrl(p.ical_url)}</td>
+                      <td>
+                        ${p.room_count
+                          ? html`${p.room_count} 室`
+                          : html`<span class="muted">未設定</span>`}
+                      </td>
                       <td>${p.active ? "有効" : html`<span class="muted">無効</span>`}</td>
                     </tr>
                   `,
@@ -185,146 +208,132 @@ export function propertyList(c, { properties, msg }) {
             </table>
           `}
 
-      <h2 class="sub">物件を追加</h2>
-      ${propertyFormFields(c, { action: "/admin/properties", submit: "追加する" })}
+      <dialog id="new-prop">
+        <form method="post" action="/admin/properties" class="form dialog-form">
+          <h2>物件を登録</h2>
+          ${propertyFields(c)}
+          <div class="dialog-actions">
+            <button type="button" class="secondary" data-close>キャンセル</button>
+            <button type="submit">登録する</button>
+          </div>
+        </form>
+      </dialog>
     `,
   });
 }
 
 // ─────────────────────────────────────────────
-// 物件 追加/編集フォーム
+// 物件を登録（JS 無効時のフォールバックページ）
 // ─────────────────────────────────────────────
-function propertyFormFields(c, { action, submit, p = {} }) {
+export function newPropertyPage(c, { err } = {}) {
+  return authedPage(c, {
+    title: "物件を登録",
+    active: "admin",
+    body: html`
+      ${backLink("/admin/properties", "物件一覧")}
+      <h1>物件を登録</h1>
+      ${flash(err, "err")}
+      <form method="post" action="/admin/properties" class="card form">
+        ${propertyFields(c)}
+        <button type="submit">登録する</button>
+      </form>
+    `,
+  });
+}
+
+// ─────────────────────────────────────────────
+// 物件詳細（基本情報 + 間取り）
+// ─────────────────────────────────────────────
+function roomRow(c, propertyId, r, templates, idx, total) {
   return html`
-    <form method="post" action="${action}" class="card form">
+    <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="room-line">
       ${csrf(c)}
-      <label class="fld">
-        物件名
-        <input type="text" name="name" value="${p.name || ""}" maxlength="60" required />
-      </label>
-      <label class="fld">
-        iCal URL（Airbnb カレンダー）
-        <input type="url" name="ical_url" value="${p.ical_url || ""}" maxlength="500" required />
-      </label>
-      <label class="fld">
-        チェックアウト時刻
-        <input type="time" name="checkout_time" value="${p.checkout_time || "10:00"}" required />
-      </label>
-      <label class="fld">
-        メモ（任意）
-        <textarea name="note" rows="2" maxlength="500">${p.note || ""}</textarea>
-      </label>
-      <button type="submit">${submit}</button>
+      <input class="room-name" type="text" name="name" value="${r.name}" maxlength="40" required />
+      <select name="template_id" class="room-tpl">
+        <option value="">テンプレ未割当</option>
+        ${templates.map(
+          (t) => html`
+            <option value="${t.id}" ${String(r.template_id) === String(t.id) ? "selected" : ""}>
+              ${t.name}${t.items != null ? html` (${t.items})` : raw("")}
+            </option>
+          `,
+        )}
+      </select>
+      <button type="submit" class="secondary sm" title="保存">保存</button>
+      <span class="room-ops">
+        <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
+          name="dir" value="up" class="linkbtn" ${idx === 0 ? "disabled" : ""}>↑</button>
+        <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
+          name="dir" value="down" class="linkbtn" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+        <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/delete"
+          class="linkbtn danger" onclick="return confirm('この間取りを削除しますか？')">✕</button>
+      </span>
     </form>
   `;
 }
 
-function roomRow(c, propertyId, r, templates, idx, total) {
-  return html`
-    <div class="card room-row">
-      <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="form">
-        ${csrf(c)}
-        <label class="fld">
-          間取り名
-          <input type="text" name="name" value="${r.name}" maxlength="40" required />
-        </label>
-        <label class="fld">
-          チェックテンプレート
-          <select name="template_id">
-            <option value="">（未割当）</option>
-            ${templates.map(
-              (t) => html`
-                <option value="${t.id}" ${String(r.template_id) === String(t.id) ? "selected" : ""}>
-                  ${t.name}
-                </option>
-              `,
-            )}
-          </select>
-        </label>
-        <div class="row-actions">
-          <button type="submit" class="secondary sm">保存</button>
-          <span class="muted sm">
-            ${r.template_id
-              ? html`${r.item_count} 項目`
-              : html`<span style="color:var(--orange)">テンプレ未割当</span>`}
-          </span>
-        </div>
-      </form>
-      <div class="row-actions">
-        <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/move" class="inline">
-          ${csrf(c)}<input type="hidden" name="dir" value="up" />
-          <button type="submit" class="secondary sm" ${idx === 0 ? "disabled" : ""}>↑</button>
-        </form>
-        <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/move" class="inline">
-          ${csrf(c)}<input type="hidden" name="dir" value="down" />
-          <button type="submit" class="secondary sm" ${idx === total - 1 ? "disabled" : ""}>↓</button>
-        </form>
-        <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/delete" class="inline"
-              onsubmit="return confirm('この間取りを削除しますか？')">
-          ${csrf(c)}
-          <button type="submit" class="secondary danger sm">削除</button>
-        </form>
-      </div>
-    </div>
-  `;
-}
-
 export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
+  const roomsMissingTpl = rooms.filter((r) => !r.template_id).length;
   return authedPage(c, {
-    title: p ? p.name : "物件を追加",
+    title: p.name,
     active: "admin",
     body: html`
       ${backLink("/admin/properties", "物件一覧")}
-      <h1>${p ? "物件を編集" : "物件を追加"}</h1>
+      <h1>${p.name}</h1>
       ${flash(err, "err")}${flash(msg)}
-      ${propertyFormFields(c, {
-        action: p ? `/admin/properties/${p.id}` : "/admin/properties",
-        submit: p ? "保存する" : "追加する",
-        p: p || {},
-      })}
 
-      ${p
-        ? html`
-            <h2 class="sub">間取り</h2>
-            <p class="muted sm">
-              キッチン・トイレ・リビングなど、部屋ごとにチェックテンプレートを割り当てます。
-              清掃はこれらを全部まとめたチェックリストで生成されます。
-            </p>
-            ${rooms.length === 0
-              ? html`<div class="card muted">まだ間取りがありません。下から追加してください。</div>`
-              : rooms.map((r, i) => roomRow(c, p.id, r, templates, i, rooms.length))}
+      <form method="post" action="/admin/properties/${p.id}" class="card form">
+        ${propertyFields(c, p)}
+        <button type="submit">基本情報を保存</button>
+      </form>
 
-            <form method="post" action="/admin/properties/${p.id}/rooms" class="card form">
-              ${csrf(c)}
-              <label class="fld">
-                間取り名を追加
-                <input type="text" name="name" maxlength="40" placeholder="例: キッチン" required />
-              </label>
-              <label class="fld">
-                チェックテンプレート
-                <select name="template_id">
-                  <option value="">（あとで割当）</option>
-                  ${templates.map((t) => html`<option value="${t.id}">${t.name}</option>`)}
-                </select>
-              </label>
-              <button type="submit">間取りを追加</button>
-            </form>
-            <p class="muted sm">
-              テンプレートは <a href="/admin/templates">テンプレート管理</a> で作成・編集します。
-            </p>
+      <h2 class="sub">間取り <span class="muted sm">${rooms.length} 室</span></h2>
+      <p class="muted sm">
+        キッチン・浴室・リビングなど部屋ごとにチェックテンプレートを割り当てます。
+        清掃はこれらをまとめたチェックリストで生成されます。
+        ${roomsMissingTpl ? html`<br /><strong style="color:var(--orange)">テンプレ未割当の間取りが ${roomsMissingTpl} 室あります。</strong>` : raw("")}
+      </p>
 
-            <form method="post" action="/admin/properties/${p.id}/toggle" class="card form">
-              ${csrf(c)}
-              <p class="muted">
-                この物件は現在 <strong>${p.active ? "有効" : "無効"}</strong> です。
-                無効にすると同期対象から外れます（データは保持）。
-              </p>
-              <button type="submit" class="secondary">
-                ${p.active ? "無効にする" : "有効に戻す"}
-              </button>
-            </form>
-          `
-        : raw("")}
+      <div class="card room-list">
+        ${rooms.length === 0
+          ? html`<p class="muted sm">まだ間取りがありません。</p>`
+          : rooms.map((r, i) => roomRow(c, p.id, r, templates, i, rooms.length))}
+        <form method="post" action="/admin/properties/${p.id}/rooms" class="room-line room-add">
+          ${csrf(c)}
+          <input class="room-name" type="text" name="name" maxlength="40" placeholder="間取り名（例: キッチン）" required />
+          <select name="template_id" class="room-tpl">
+            <option value="">テンプレ未割当</option>
+            ${templates.map(
+              (t) => html`<option value="${t.id}">${t.name}${t.items != null ? html` (${t.items})` : raw("")}</option>`,
+            )}
+          </select>
+          <button type="submit" class="sm">追加</button>
+        </form>
+      </div>
+      <p class="muted sm">
+        テンプレートは <a href="/admin/templates">テンプレート管理</a> で作成・編集します。
+      </p>
+
+      <form method="post" action="/admin/properties/${p.id}/resnapshot" class="card form"
+            onsubmit="return confirm('未完了の清掃のチェックリストを現在のテンプレートで作り直します。チェック状態はリセットされます。よろしいですか？')">
+        ${csrf(c)}
+        <p class="muted sm">
+          間取り／テンプレを変更したあと、既存の未完了清掃にも反映したいときに押します
+          （同期時にも自動で反映されます）。
+        </p>
+        <button type="submit" class="secondary">チェックリストを再生成</button>
+      </form>
+
+      <form method="post" action="/admin/properties/${p.id}/toggle" class="card form">
+        ${csrf(c)}
+        <p class="muted">
+          この物件は現在 <strong>${p.active ? "有効" : "無効"}</strong> です。
+          無効にすると同期対象から外れます（データは保持）。
+        </p>
+        <button type="submit" class="secondary">
+          ${p.active ? "無効にする" : "有効に戻す"}
+        </button>
+      </form>
     `,
   });
 }
