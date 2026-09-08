@@ -176,7 +176,10 @@ cleanings.get("/:id", async (c) => {
   if (!cleaning) return c.notFound();
   const items = await all(
     c.env.DB,
-    "SELECT * FROM checklist_item WHERE cleaning_id = ? ORDER BY area_label, sort_order, id",
+    `SELECT i.*, u.name AS checked_by_name
+     FROM checklist_item i
+     LEFT JOIN user u ON u.id = i.checked_by
+     WHERE i.cleaning_id = ? ORDER BY i.area_label, i.sort_order, i.id`,
     id,
   );
   return cleaningDetailPage(c, { cleaning, items, msg: c.req.query("msg") });
@@ -241,4 +244,62 @@ cleanings.post("/:id/note", async (c) => {
   const note = String(body.note || "").trim().slice(0, 2000);
   await run(c.env.DB, "UPDATE cleaning SET note = ? WHERE id = ?", note || null, id);
   return c.redirect(to(`/cleanings/${id}`, "メモを保存しました"));
+});
+
+// ── チェック項目のトグル（FR-16）──
+cleanings.post("/:id/items/:iid/toggle", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const iid = parseInt(c.req.param("iid"), 10);
+  const body = await form(c);
+  const wantsJson = (c.req.header("accept") || "").includes("application/json");
+  if (!body) return wantsJson ? c.json({ ok: false, error: "bad_request" }, 400) : badReq(c);
+
+  const cl = await one(c.env.DB, "SELECT id, status FROM cleaning WHERE id = ?", id);
+  if (!cl) return c.notFound();
+  const item = await one(
+    c.env.DB,
+    "SELECT id, checked FROM checklist_item WHERE id = ? AND cleaning_id = ?",
+    iid,
+    id,
+  );
+  if (!item) return c.notFound();
+
+  if (cl.status === "cancelled") {
+    return wantsJson
+      ? c.json({ ok: false, error: "cancelled" }, 409)
+      : c.redirect(to(`/cleanings/${id}`, "キャンセル済みの清掃は編集できません"));
+  }
+
+  const now = item.checked ? 0 : 1;
+  const uid = c.get("user").id;
+  await run(
+    c.env.DB,
+    "UPDATE checklist_item SET checked = ?, checked_by = ?, checked_at = ? WHERE id = ?",
+    now,
+    now ? uid : null,
+    now ? nowIso() : null,
+    iid,
+  );
+
+  if (!wantsJson) return c.redirect(`/cleanings/${id}`);
+
+  const items = await all(
+    c.env.DB,
+    "SELECT area_label, checked FROM checklist_item WHERE cleaning_id = ?",
+    id,
+  );
+  const row = await one(c.env.DB, "SELECT area_label FROM checklist_item WHERE id = ?", iid);
+  const area = row?.area_label;
+  const areaItems = items.filter((x) => x.area_label === area);
+  return c.json({
+    ok: true,
+    checked: now,
+    checkedBy: now ? c.get("user").name : null,
+    overall: { done: items.filter((x) => x.checked).length, total: items.length },
+    area: {
+      label: area,
+      done: areaItems.filter((x) => x.checked).length,
+      total: areaItems.length,
+    },
+  });
 });

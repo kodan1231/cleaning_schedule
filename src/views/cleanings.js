@@ -186,6 +186,8 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
   const areas = groupByArea(items);
   const total = items.length;
   const doneN = items.filter((i) => i.checked).length;
+  const incomplete = total - doneN;
+  const editable = cl.status !== "cancelled";
 
   return authedPage(c, {
     title: cl.property_name,
@@ -215,7 +217,7 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
           : raw("")}
       </div>
 
-      ${statusActions(c, cl)}
+      ${statusActions(c, cl, incomplete)}
 
       <form method="post" action="/cleanings/${cl.id}/note" class="card form">
         ${csrf(c)}
@@ -226,7 +228,10 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
         <button type="submit" class="secondary">メモを保存</button>
       </form>
 
-      <h2 class="sub">チェックリスト ${total ? html`<span class="muted sm">${doneN}/${total}</span>` : raw("")}</h2>
+      <h2 class="sub">
+        チェックリスト
+        ${total ? html`<span class="muted sm" data-overall>${doneN}/${total}</span>` : raw("")}
+      </h2>
       ${total === 0
         ? html`<div class="card muted">この清掃にはチェック項目がありません（物件にテンプレート未割当）。</div>`
         : areas.map(
@@ -234,30 +239,48 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
               <div class="card area">
                 <h3>
                   ${a.label}
-                  <span class="muted sm">
+                  <span class="muted sm" data-area-prog="${a.label}">
                     ${a.items.filter((i) => i.checked).length}/${a.items.length}
                   </span>
                 </h3>
-                <ul class="items ro">
-                  ${a.items.map(
-                    (it) => html`
-                      <li class="${it.checked ? "on" : ""}">
-                        <span class="mark">${it.checked ? "✓" : "○"}</span>
-                        <span class="lbl">${it.label}</span>
-                        ${it.needs_photo ? html`<span class="badge photo">写真必須</span>` : raw("")}
-                      </li>
-                    `,
-                  )}
+                <ul class="items">
+                  ${a.items.map((it) => checkItem(c, cl, it, editable))}
                 </ul>
               </div>
             `,
           )}
-      ${total ? html`<p class="muted sm">※ チェック操作は P5、写真は P6 で追加します。</p>` : raw("")}
+      ${total && !editable
+        ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
+        : raw("")}
     `,
   });
 }
 
-function statusActions(c, cl) {
+function checkItem(c, cl, it, editable) {
+  const inner = html`
+    <span class="mark">${it.checked ? "✓" : "○"}</span>
+    <span class="lbl">${it.label}</span>
+    ${it.needs_photo ? html`<span class="badge photo">写真必須</span>` : raw("")}
+    ${it.checked && it.checked_by_name
+      ? html`<span class="by muted sm">${it.checked_by_name}</span>`
+      : raw("")}
+  `;
+  if (!editable) {
+    return html`<li class="ro ${it.checked ? "on" : ""}" data-area="${it.area_label}">${inner}</li>`;
+  }
+  return html`
+    <li class="${it.checked ? "on" : ""}" data-area="${it.area_label}">
+      <form method="post" action="/cleanings/${cl.id}/items/${it.id}/toggle" class="chk-form">
+        ${csrf(c)}
+        <button type="submit" class="chk-row" aria-pressed="${it.checked ? "true" : "false"}">
+          ${inner}
+        </button>
+      </form>
+    </li>
+  `;
+}
+
+function statusActions(c, cl, incomplete = 0) {
   if (cl.status === "cancelled") {
     return html`<div class="card err">この清掃はキャンセルされています（予約が取り消されました）。</div>`;
   }
@@ -271,8 +294,12 @@ function statusActions(c, cl) {
   }
   if (cl.status === "in_progress") {
     return html`
-      <form method="post" action="/cleanings/${cl.id}/complete" class="card">
+      <form method="post" action="/cleanings/${cl.id}/complete" class="card" data-complete-form
+            data-incomplete="${incomplete}">
         ${csrf(c)}
+        ${incomplete > 0
+          ? html`<p class="muted sm" data-incomplete-note>未チェックの項目が ${incomplete} 件あります。</p>`
+          : raw("")}
         <button type="submit">完了にする</button>
       </form>
     `;
