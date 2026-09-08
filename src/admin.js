@@ -137,7 +137,7 @@ async function propertyDetailData(c, id, extra = {}) {
   if (!p) return null;
   const rooms = await all(
     c.env.DB,
-    `SELECT r.id, r.name, r.sort_order, r.template_id, t.name AS template_name,
+    `SELECT r.id, r.name, r.group_label, r.sort_order, r.template_id, t.name AS template_name,
             (SELECT COUNT(*) FROM checklist_template_item i WHERE i.template_id = r.template_id) AS item_count
      FROM room r LEFT JOIN checklist_template t ON t.id = r.template_id
      WHERE r.property_id = ? ORDER BY r.sort_order, r.id`,
@@ -222,14 +222,16 @@ admin.post("/properties/:id/rooms", async (c) => {
     return propertyForm(c, await propertyDetailData(c, id, { err: "間取り名は1〜40文字です" }));
   }
   const templateId = /^\d+$/.test(String(body.template_id)) ? parseInt(body.template_id, 10) : null;
+  const group = String(body.group_label || "").trim().slice(0, 30) || null;
   const next =
     (await one(c.env.DB, "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM room WHERE property_id = ?", id))
       ?.n || 1;
   await run(
     c.env.DB,
-    "INSERT INTO room (property_id, name, sort_order, template_id, created_at) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO room (property_id, name, group_label, sort_order, template_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     id,
     name,
+    group,
     next,
     templateId,
     nowIso(),
@@ -270,10 +272,12 @@ admin.post("/properties/:id/rooms/:rid", async (c) => {
     return propertyForm(c, await propertyDetailData(c, id, { err: "間取り名は1〜40文字です" }));
   }
   const templateId = /^\d+$/.test(String(body.template_id)) ? parseInt(body.template_id, 10) : null;
+  const group = String(body.group_label || "").trim().slice(0, 30) || null;
   await run(
     c.env.DB,
-    "UPDATE room SET name = ?, template_id = ? WHERE id = ?",
+    "UPDATE room SET name = ?, group_label = ?, template_id = ? WHERE id = ?",
     name,
+    group,
     templateId,
     rid,
   );

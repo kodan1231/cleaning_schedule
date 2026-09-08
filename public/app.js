@@ -64,6 +64,25 @@ document.addEventListener("submit", async (ev) => {
     const overallEl = document.querySelector("[data-overall]");
     if (overallEl) overallEl.textContent = `${data.overall.done}/${data.overall.total}`;
 
+    // 全部チェック済みの間取りは自動で閉じる
+    const block = li.closest(".room-block");
+    if (block && data.room.total > 0) {
+      block.open = !(data.room.done === data.room.total);
+    }
+    // 階の進捗と自動折りたたみ
+    const floor = block && block.closest(".floor");
+    if (floor) {
+      const progs = [...floor.querySelectorAll("[data-room-prog]")].map((el) => {
+        const m = el.textContent.match(/(\d+)\s*\/\s*(\d+)/);
+        return m ? [+m[1], +m[2]] : [0, 0];
+      });
+      const fd = progs.reduce((s, p) => s + p[0], 0);
+      const ft = progs.reduce((s, p) => s + p[1], 0);
+      const fp = floor.querySelector("[data-floor-prog]");
+      if (fp) fp.textContent = `${fd}/${ft}`;
+      if (ft > 0) floor.open = !(fd === ft);
+    }
+
     // 完了フォームの未チェック件数
     const cf = document.querySelector("[data-complete-form]");
     if (cf) {
@@ -197,9 +216,9 @@ document.addEventListener("change", async (ev) => {
   const file = input.files && input.files[0];
   if (!file) return;
   const form = input.closest(".photo-form");
-  const label = form.querySelector(".photo-btn span");
+  const label = form.querySelector("label span") || form.querySelector(".photo-btn");
   const orig = label ? label.textContent : "";
-  if (label) label.textContent = "処理中…";
+  if (label) label.textContent = "…";
   form.classList.add("busy");
 
   try {

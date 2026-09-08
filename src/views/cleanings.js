@@ -1,7 +1,7 @@
 import { html, raw } from "../lib/html.js";
 import { authedPage } from "./layout.js";
 import { fmtDateJst, fmtDateTimeJst, todayJst } from "../lib/datetime.js";
-import { groupByRoom } from "../lib/checklist.js";
+import { groupByRoom, groupByFloor } from "../lib/checklist.js";
 import { workDurationMs, fmtDuration } from "../lib/events.js";
 
 const EVENT_LABEL = {
@@ -272,22 +272,21 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
         ? html`<div class="card muted">
             この清掃にはチェック項目がありません（物件に間取り／テンプレート未設定）。
           </div>`
-        : rooms.map(
-            (r) => html`
-              <div class="card area">
-                <h3>
-                  ${r.name}
-                  <span class="muted sm" data-room-prog="${r.name}">
-                    ${r.items.filter((i) => i.checked).length}/${r.items.length}
-                  </span>
-                </h3>
-                <ul class="items">
-                  ${r.items.map((it) =>
-                    checkItem(c, cl, it, editable, photosByItem.get(it.id) || []),
-                  )}
-                </ul>
-              </div>
-            `,
+        : groupByFloor(rooms).map((section) =>
+            section.group
+              ? html`
+                  <details class="floor" ${section.done < section.total ? "open" : ""}
+                           data-floor="${section.group}">
+                    <summary class="floor-sum">
+                      <span>${section.group}</span>
+                      <span class="muted sm" data-floor-prog="${section.group}">
+                        ${section.done}/${section.total}
+                      </span>
+                    </summary>
+                    ${section.rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem))}
+                  </details>
+                `
+              : html`${section.rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem))}`,
           )}
       ${total && !editable
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
@@ -340,46 +339,67 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
   });
 }
 
+function roomBlock(c, cl, r, editable, photosByItem) {
+  const complete = r.total > 0 && r.done === r.total;
+  return html`
+    <details class="card room-block" ${complete ? "" : "open"} data-room-block="${r.name}">
+      <summary class="room-sum">
+        <span class="room-name">${r.name}</span>
+        <span class="muted sm" data-room-prog="${r.name}">${r.done}/${r.total}</span>
+      </summary>
+      <ul class="items">
+        ${r.items.map((it) => checkItem(c, cl, it, editable, photosByItem.get(it.id) || []))}
+      </ul>
+    </details>
+  `;
+}
+
 function checkItem(c, cl, it, editable, itemPhotos = []) {
   const inner = html`
     <span class="mark">${it.checked ? "✓" : "○"}</span>
     <span class="lbl">${it.label}</span>
-    ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
     ${it.checked && it.checked_by_name
       ? html`<span class="by muted sm">${it.checked_by_name}</span>`
       : raw("")}
   `;
-  const media =
-    itemPhotos.length || editable
-      ? html`
-          <div class="item-media">
-            ${itemPhotos.length ? photoStrip(itemPhotos) : raw("")}
-            ${editable ? uploadWidget(c, cl.id, it.id) : raw("")}
-          </div>
-        `
-      : raw("");
-
-  if (!editable) {
-    return html`<li class="ro ${it.checked ? "on" : ""}" data-room="${it.room_name}">
-      ${inner}${media}
-    </li>`;
-  }
+  const toggle = editable
+    ? html`
+        <form method="post" action="/cleanings/${cl.id}/items/${it.id}/toggle" class="chk-form">
+          ${csrf(c)}
+          <button type="submit" class="chk-toggle" aria-pressed="${it.checked ? "true" : "false"}">
+            ${inner}
+          </button>
+        </form>
+      `
+    : html`<div class="chk-toggle ro">${inner}</div>`;
   return html`
-    <li class="${it.checked ? "on" : ""}" data-room="${it.room_name}">
-      <form method="post" action="/cleanings/${cl.id}/items/${it.id}/toggle" class="chk-form">
-        ${csrf(c)}
-        <button type="submit" class="chk-row" aria-pressed="${it.checked ? "true" : "false"}">
-          ${inner}
-        </button>
-      </form>
-      ${media}
+    <li class="chk-item ${it.checked ? "on" : ""}" data-room="${it.room_name}">
+      <div class="chk-line">
+        ${toggle}
+        ${editable ? cameraBtn(c, cl.id, it.id, it.needs_photo) : raw("")}
+      </div>
+      ${itemPhotos.length ? photoStrip(itemPhotos, "sm") : raw("")}
     </li>
   `;
 }
 
-function photoStrip(list) {
+function cameraBtn(c, cleaningId, itemId, want) {
   return html`
-    <div class="photos">
+    <form class="photo-form cam" method="post" action="/cleanings/${cleaningId}/photos"
+          enctype="multipart/form-data" data-cleaning="${cleaningId}" data-item="${itemId}">
+      ${csrf(c)}
+      <input type="hidden" name="item_id" value="${itemId}" />
+      <label class="cam-btn ${want ? "want" : ""}" title="写真を追加">
+        <input type="file" name="full" accept="image/*" />
+        <span aria-hidden="true">📷</span>
+      </label>
+    </form>
+  `;
+}
+
+function photoStrip(list, size = "") {
+  return html`
+    <div class="photos ${size === "sm" ? "photos-sm" : ""}">
       ${list.map(
         (p) => html`
           <a class="thumb" href="/photos/${p.id}?view=1">

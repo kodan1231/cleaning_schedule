@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS room (
   id          INTEGER PRIMARY KEY,
   property_id INTEGER NOT NULL REFERENCES property(id) ON DELETE CASCADE,
   name        TEXT    NOT NULL,
+  group_label TEXT,                       -- 階など（例「1階」）。表示の折りたたみ用・任意
   sort_order  INTEGER NOT NULL DEFAULT 0,
   template_id INTEGER REFERENCES checklist_template(id),
   created_at  TEXT    NOT NULL
@@ -115,6 +116,7 @@ CREATE TABLE IF NOT EXISTS checklist_item (
   id          INTEGER PRIMARY KEY,
   cleaning_id INTEGER NOT NULL REFERENCES cleaning(id) ON DELETE CASCADE,
   room_name   TEXT    NOT NULL,           -- 間取り名（スナップショット時点）
+  room_group  TEXT,                       -- 間取りのグループ名（階など）
   room_sort   INTEGER NOT NULL DEFAULT 0,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   item_key    TEXT    NOT NULL,
@@ -198,7 +200,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '3');
+  ('schema_version', '4');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)

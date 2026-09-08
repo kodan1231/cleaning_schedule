@@ -250,6 +250,8 @@ function roomRow(c, propertyId, r, templates, idx, total) {
       ${csrf(c)}
       <span class="room-grip" aria-hidden="true" title="ドラッグで並べ替え">⠿</span>
       <input class="room-name" type="text" name="name" value="${r.name}" maxlength="40" required />
+      <input class="room-group" type="text" name="group_label" value="${r.group_label || ""}"
+        maxlength="30" placeholder="グループ" list="room-groups" />
       <select name="template_id" class="room-tpl">
         <option value="">テンプレ未割当</option>
         ${templates.map(
@@ -290,10 +292,16 @@ export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
 
       <h2 class="sub">間取り <span class="muted sm">${rooms.length} 室</span></h2>
       <p class="muted sm">
-        キッチン・浴室・リビングなど部屋ごとにチェックテンプレートを割り当てます。
-        清掃はこれらをまとめたチェックリストで生成されます。
+        部屋ごとにチェックテンプレートを割り当てます。清掃はこれらをまとめて生成されます。
+        「グループ」（例: 1階／2階／屋外）は清掃画面での折りたたみ表示に使います（任意）。
         ${roomsMissingTpl ? html`<br /><strong style="color:var(--orange)">テンプレ未割当の間取りが ${roomsMissingTpl} 室あります。</strong>` : raw("")}
       </p>
+
+      <datalist id="room-groups">
+        ${[...new Set(rooms.map((r) => r.group_label).filter(Boolean))].map(
+          (g) => html`<option value="${g}"></option>`,
+        )}
+      </datalist>
 
       <div class="card room-list" data-reorder-url="/admin/properties/${p.id}/rooms/reorder">
         <div class="room-sortable">
@@ -305,6 +313,7 @@ export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
         <form method="post" action="/admin/properties/${p.id}/rooms" class="room-line room-add">
           ${csrf(c)}
           <input class="room-name" type="text" name="name" maxlength="40" placeholder="間取り名（例: キッチン）" required />
+          <input class="room-group" type="text" name="group_label" maxlength="30" placeholder="グループ" list="room-groups" />
           <select name="template_id" class="room-tpl">
             <option value="">テンプレ未割当</option>
             ${templates.map(
