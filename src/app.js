@@ -6,7 +6,7 @@ import { page } from "./views/layout.js";
 import { loginPage, registerPage } from "./views/auth.js";
 import { admin } from "./admin.js";
 import { dashboard, cleanings } from "./cleanings.js";
-import { one, all, run, getMeta, ping } from "./db/queries.js";
+import { one, run, getMeta, ping } from "./db/queries.js";
 import {
   hashPin,
   verifyPin,
@@ -128,9 +128,8 @@ app.get("/login", async (c) => {
   const token = getCookie(c, "sess");
   if (token && (await verifySession(c.env.SESSION_SECRET, token))) return c.redirect("/");
 
-  const users = await all(c.env.DB, "SELECT id, name FROM user WHERE active = 1 ORDER BY id");
   const csrf = ensureCsrf(c);
-  return loginPage(c, { users, csrf, next: safeNext(c.req.query("next")) });
+  return loginPage(c, { csrf, next: safeNext(c.req.query("next")) });
 });
 
 app.post("/login", async (c) => {
@@ -139,17 +138,16 @@ app.post("/login", async (c) => {
 
   const csrf = ensureCsrf(c);
   const next = safeNext(body.next);
-  const users = await all(c.env.DB, "SELECT id, name FROM user WHERE active = 1 ORDER BY id");
-  const fail = (error) => loginPage(c, { users, csrf, next, error }, 401);
+  const name = String(body.name || "").trim();
+  const fail = (error) => loginPage(c, { csrf, next, name, error }, 401);
 
-  const uid = parseInt(body.user_id, 10);
   const pin = String(body.pin || "");
-  if (!uid || !/^[0-9]+$/.test(pin)) return fail("名前と PIN を入力してください");
+  if (!name || !/^[0-9]+$/.test(pin)) return fail("名前と PIN を入力してください");
 
   const u = await one(
     c.env.DB,
-    "SELECT id, name, role, active, pin_hash, failed_count, locked_until FROM user WHERE id = ?",
-    uid,
+    "SELECT id, name, role, active, pin_hash, failed_count, locked_until FROM user WHERE name = ?",
+    name,
   );
   if (!u || !u.active) return fail("ユーザーまたは PIN が違います");
 

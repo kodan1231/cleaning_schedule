@@ -13,6 +13,7 @@ import {
   monthGrid,
 } from "./lib/datetime.js";
 import { snapshotChecklist } from "./lib/checklist.js";
+import { logEvent } from "./lib/events.js";
 import { dashboardPage, cleaningDetailPage, newCleaningPage } from "./views/cleanings.js";
 
 async function form(c) {
@@ -182,11 +183,18 @@ cleanings.get("/:id", async (c) => {
      WHERE i.cleaning_id = ? ORDER BY i.area_label, i.sort_order, i.id`,
     id,
   );
-  return cleaningDetailPage(c, { cleaning, items, msg: c.req.query("msg") });
+  const events = await all(
+    c.env.DB,
+    `SELECT e.kind, e.at, e.detail, u.name AS user_name
+     FROM cleaning_event e LEFT JOIN user u ON u.id = e.user_id
+     WHERE e.cleaning_id = ? ORDER BY e.at ASC, e.id ASC`,
+    id,
+  );
+  return cleaningDetailPage(c, { cleaning, items, events, msg: c.req.query("msg") });
 });
 
 // ── 状態遷移 ──
-async function transition(c, { from: fromStatus, set, okMsg, busyMsg }) {
+async function transition(c, { from: fromStatus, set, kind, okMsg, busyMsg }) {
   const id = parseInt(c.req.param("id"), 10);
   const body = await form(c);
   if (!body) return badReq(c);
@@ -196,12 +204,14 @@ async function transition(c, { from: fromStatus, set, okMsg, busyMsg }) {
     return c.redirect(to(`/cleanings/${id}`, busyMsg));
   }
   await run(c.env.DB, `UPDATE cleaning SET ${set.sql} WHERE id = ?`, ...set.args(c), id);
+  await logEvent(c.env.DB, id, kind, c.get("user").id);
   return c.redirect(to(`/cleanings/${id}`, okMsg));
 }
 
 cleanings.post("/:id/start", (c) =>
   transition(c, {
     from: "pending",
+    kind: "start",
     set: {
       sql: "status = 'in_progress', started_by = ?, started_at = ?",
       args: (ctx) => [ctx.get("user").id, nowIso()],
@@ -214,6 +224,7 @@ cleanings.post("/:id/start", (c) =>
 cleanings.post("/:id/complete", (c) =>
   transition(c, {
     from: "in_progress",
+    kind: "complete",
     set: {
       sql: "status = 'done', completed_by = ?, completed_at = ?",
       args: (ctx) => [ctx.get("user").id, nowIso()],
@@ -226,6 +237,7 @@ cleanings.post("/:id/complete", (c) =>
 cleanings.post("/:id/reopen", (c) =>
   transition(c, {
     from: "done",
+    kind: "reopen",
     set: {
       sql: "status = 'in_progress', completed_by = NULL, completed_at = NULL",
       args: () => [],
@@ -243,6 +255,7 @@ cleanings.post("/:id/note", async (c) => {
   if (!cl) return c.notFound();
   const note = String(body.note || "").trim().slice(0, 2000);
   await run(c.env.DB, "UPDATE cleaning SET note = ? WHERE id = ?", note || null, id);
+  await logEvent(c.env.DB, id, "note", c.get("user").id);
   return c.redirect(to(`/cleanings/${id}`, "メモを保存しました"));
 });
 
@@ -257,6 +270,7 @@ cleanings.post("/:id/delete", async (c) => {
   await run(c.env.DB, "DELETE FROM checklist_item WHERE cleaning_id = ?", id);
   await run(c.env.DB, "DELETE FROM photo_blob WHERE photo_id IN (SELECT id FROM photo WHERE cleaning_id = ?)", id);
   await run(c.env.DB, "DELETE FROM photo WHERE cleaning_id = ?", id);
+  await run(c.env.DB, "DELETE FROM cleaning_event WHERE cleaning_id = ?", id);
   await run(c.env.DB, "DELETE FROM cleaning WHERE id = ?", id);
   return c.redirect(to("/", "清掃を削除しました"));
 });
@@ -273,7 +287,7 @@ cleanings.post("/:id/items/:iid/toggle", async (c) => {
   if (!cl) return c.notFound();
   const item = await one(
     c.env.DB,
-    "SELECT id, checked FROM checklist_item WHERE id = ? AND cleaning_id = ?",
+    "SELECT id, checked, label FROM checklist_item WHERE id = ? AND cleaning_id = ?",
     iid,
     id,
   );
@@ -295,6 +309,7 @@ cleanings.post("/:id/items/:iid/toggle", async (c) => {
     now ? nowIso() : null,
     iid,
   );
+  await logEvent(c.env.DB, id, now ? "check" : "uncheck", uid, item.label);
 
   if (!wantsJson) return c.redirect(`/cleanings/${id}`);
 

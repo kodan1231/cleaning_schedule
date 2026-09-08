@@ -2,7 +2,7 @@ import { html, raw } from "../lib/html.js";
 import { page } from "./layout.js";
 
 /** ログイン画面 */
-export function loginPage(c, { users = [], csrf, next = "", error = "" }, status = 200) {
+export function loginPage(c, { csrf, next = "", name = "", error = "" }, status = 200) {
   return page(
     c,
     {
@@ -14,22 +14,18 @@ export function loginPage(c, { users = [], csrf, next = "", error = "" }, status
         <form method="post" action="/login" class="card form">
           <input type="hidden" name="_csrf" value="${csrf}" />
           <input type="hidden" name="next" value="${next}" />
-          <fieldset class="userpick">
-            <legend>名前</legend>
-            ${users.map(
-              (u, i) => html`
-                <label class="pick">
-                  <input
-                    type="radio"
-                    name="user_id"
-                    value="${u.id}"
-                    ${i === 0 ? "checked" : ""}
-                  />
-                  <span>${u.name}</span>
-                </label>
-              `,
-            )}
-          </fieldset>
+          <label class="fld">
+            名前
+            <input
+              type="text"
+              name="name"
+              value="${name}"
+              autocomplete="username"
+              autocapitalize="off"
+              maxlength="30"
+              required
+            />
+          </label>
           <label class="fld">
             PIN
             <input
@@ -37,7 +33,7 @@ export function loginPage(c, { users = [], csrf, next = "", error = "" }, status
               name="pin"
               inputmode="numeric"
               pattern="[0-9]*"
-              autocomplete="off"
+              autocomplete="current-password"
               required
             />
           </label>

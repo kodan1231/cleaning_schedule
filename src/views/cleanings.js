@@ -2,6 +2,18 @@ import { html, raw } from "../lib/html.js";
 import { authedPage } from "./layout.js";
 import { fmtDateJst, fmtDateTimeJst, todayJst } from "../lib/datetime.js";
 import { groupByArea } from "../lib/checklist.js";
+import { workDurationMs, fmtDuration } from "../lib/events.js";
+
+const EVENT_LABEL = {
+  start: "開始",
+  complete: "完了",
+  reopen: "作業中に戻す",
+  note: "メモ更新",
+  check: "チェック",
+  uncheck: "チェック解除",
+  photo_add: "写真追加",
+  photo_delete: "写真削除",
+};
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -34,6 +46,10 @@ function cleaningCard(c, today) {
       : c.status === "in_progress"
         ? c.started_by_name
         : null;
+  const elapsed =
+    c.status === "done" && c.started_at && c.completed_at
+      ? fmtDuration(Math.max(0, Date.parse(c.completed_at) - Date.parse(c.started_at)))
+      : null;
   return html`
     <a class="ccard status-${c.status} ${overdue ? "overdue" : ""}" href="/cleanings/${c.id}">
       <div class="ccard-row">
@@ -44,7 +60,12 @@ function cleaningCard(c, today) {
         <span class="cprop">${c.property_name}</span>
         ${progress(c)}
       </div>
-      ${who ? html`<div class="ccard-row muted sm">担当: ${who}</div>` : raw("")}
+      ${who || elapsed
+        ? html`<div class="ccard-row muted sm">
+            ${who ? html`担当: ${who}` : raw("")}
+            ${elapsed ? html`<span>所要 ${elapsed}</span>` : raw("")}
+          </div>`
+        : raw("")}
       ${overdue ? html`<div class="ccard-row sm" style="color:var(--orange)">期限切れ</div>` : raw("")}
     </a>
   `;
@@ -176,13 +197,16 @@ export function dashboardPage(c, opts) {
 // ─────────────────────────────────────────────
 // S-03 清掃詳細
 // ─────────────────────────────────────────────
-export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
+export function cleaningDetailPage(c, { cleaning: cl, items, events = [], msg }) {
   const areas = groupByArea(items);
   const total = items.length;
   const doneN = items.filter((i) => i.checked).length;
   const incomplete = total - doneN;
   const editable = cl.status !== "cancelled";
   const isAdmin = c.get("user").role === "admin";
+  const hasStarted = events.some((e) => e.kind === "start");
+  const durationMs = workDurationMs(events);
+  const running = cl.status === "in_progress";
 
   return authedPage(c, {
     title: cl.property_name,
@@ -209,6 +233,12 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
           : raw("")}
         ${cl.completed_by_name
           ? html`<div class="detail-line muted sm">完了: ${cl.completed_by_name} ${fmtDateTimeJst(cl.completed_at)}</div>`
+          : raw("")}
+        ${hasStarted
+          ? html`<div class="detail-line">
+              <strong>実作業時間: ${fmtDuration(durationMs)}</strong>
+              ${running ? html`<span class="muted sm">（作業中・経過）</span>` : raw("")}
+            </div>`
           : raw("")}
       </div>
 
@@ -246,6 +276,26 @@ export function cleaningDetailPage(c, { cleaning: cl, items, msg }) {
           )}
       ${total && !editable
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
+        : raw("")}
+
+      ${events.length
+        ? html`
+            <h2 class="sub">作業記録</h2>
+            <div class="card">
+              <ul class="timeline">
+                ${events.map(
+                  (e) => html`
+                    <li>
+                      <span class="tl-at">${fmtDateTimeJst(e.at)}</span>
+                      <span class="tl-kind">${EVENT_LABEL[e.kind] || e.kind}</span>
+                      ${e.detail ? html`<span class="tl-detail">${e.detail}</span>` : raw("")}
+                      ${e.user_name ? html`<span class="tl-who muted sm">${e.user_name}</span>` : raw("")}
+                    </li>
+                  `,
+                )}
+              </ul>
+            </div>
+          `
         : raw("")}
 
       ${isAdmin

@@ -116,6 +116,20 @@ CREATE TABLE IF NOT EXISTS checklist_item (
 CREATE INDEX IF NOT EXISTS idx_item_cleaning ON checklist_item(cleaning_id, sort_order);
 
 -- ─────────────────────────────────────────────
+-- 作業イベントログ（実作業時間の計測・履歴。追記のみ・不変）
+--   kind: start | complete | reopen | note | check | uncheck | photo_add | photo_delete
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS cleaning_event (
+  id          INTEGER PRIMARY KEY,
+  cleaning_id INTEGER NOT NULL REFERENCES cleaning(id) ON DELETE CASCADE,
+  kind        TEXT    NOT NULL,
+  user_id     INTEGER REFERENCES user(id),
+  at          TEXT    NOT NULL,           -- ISO8601 UTC
+  detail      TEXT                        -- 任意（項目ラベル等）
+);
+CREATE INDEX IF NOT EXISTS idx_cleanevt ON cleaning_event(cleaning_id, at);
+
+-- ─────────────────────────────────────────────
 -- 写真（メタデータ）
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS photo (

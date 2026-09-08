@@ -299,6 +299,22 @@ button[disabled] { opacity: 0.4; cursor: not-allowed; }
 .detail-line { margin: 4px 0; }
 .detail-line:first-child { margin-top: 0; }
 
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.timeline li:first-child { border-top: none; }
+.timeline .tl-at { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.timeline .tl-kind { font-weight: 700; }
+.timeline .tl-detail { color: var(--text); }
+.timeline .tl-who { margin-left: auto; }
+
 .items { list-style: none; margin: 0; padding: 0; }
 .items li { border-top: 1px solid var(--line); }
 .items li:first-child { border-top: none; }
