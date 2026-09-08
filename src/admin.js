@@ -6,6 +6,7 @@ import { one, all, run, getMeta, setMeta } from "./db/queries.js";
 import { requireAuth, requireAdmin, verifyCsrf, hashPin } from "./auth.js";
 import { itemKey, randomPin } from "./lib/ids.js";
 import { nowIso } from "./lib/datetime.js";
+import { syncProperty, runScheduledSync } from "./ical/sync.js";
 import {
   adminHome,
   propertyList,
@@ -50,7 +51,41 @@ admin.get("/", async (c) => {
      LEFT JOIN checklist_template t ON t.id = p.template_id
      ORDER BY p.active DESC, p.id`,
   );
-  return adminHome(c, { counts, properties, msg: c.req.query("msg") });
+  const syncLogs = await all(
+    db,
+    `SELECT s.run_at, s.result, s.reservations_seen, s.cleanings_created, s.cleanings_updated,
+            s.message, p.name AS property
+     FROM sync_log s LEFT JOIN property p ON p.id = s.property_id
+     ORDER BY s.run_at DESC LIMIT 15`,
+  );
+  return adminHome(c, { counts, properties, syncLogs, msg: c.req.query("msg") });
+});
+
+// ── 同期の手動実行 ──
+admin.post("/properties/:id/sync", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const p = await one(c.env.DB, "SELECT id FROM property WHERE id = ?", id);
+  if (!p) return c.notFound();
+  const r = await syncProperty(c.env, id).catch((e) => ({
+    result: "error",
+    message: String(e?.message || e),
+  }));
+  const msg =
+    r.result === "ok"
+      ? `同期しました（予約 ${r.seen} / 生成 ${r.created} / 更新 ${r.updated} / キャンセル ${r.cancelled}）`
+      : `同期エラー: ${r.message}`;
+  return c.redirect(to("/admin", msg));
+});
+
+admin.post("/sync-all", async (c) => {
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const results = await runScheduledSync(c.env);
+  const ok = results.filter((r) => r.result === "ok").length;
+  const ng = results.length - ok;
+  return c.redirect(to("/admin", `全物件同期を実行（成功 ${ok} / 失敗 ${ng}）`));
 });
 
 // ─────────────────────────────────────────────

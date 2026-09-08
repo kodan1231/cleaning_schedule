@@ -28,7 +28,8 @@ export function maskUrl(u) {
 // ─────────────────────────────────────────────
 // 管理トップ
 // ─────────────────────────────────────────────
-export function adminHome(c, { counts, properties, msg }) {
+export function adminHome(c, { counts, properties, syncLogs = [], msg }) {
+  const activeProps = properties.filter((p) => p.active).length;
   return authedPage(c, {
     title: "管理",
     active: "admin",
@@ -47,9 +48,17 @@ export function adminHome(c, { counts, properties, msg }) {
       ${properties.length === 0
         ? html`<div class="card muted">物件が登録されていません。</div>`
         : html`
+            ${activeProps > 0
+              ? html`
+                  <form method="post" action="/admin/sync-all" class="card">
+                    ${csrf(c)}
+                    <button type="submit">全物件を今すぐ同期</button>
+                  </form>
+                `
+              : raw("")}
             <table class="tbl">
               <thead>
-                <tr><th>物件</th><th>テンプレ</th><th>最終同期</th></tr>
+                <tr><th>物件</th><th>テンプレ</th><th>最終同期</th><th></th></tr>
               </thead>
               <tbody>
                 ${properties.map(
@@ -68,13 +77,50 @@ export function adminHome(c, { counts, properties, msg }) {
                               </span>`
                           : html`<span class="muted">未同期</span>`}
                       </td>
+                      <td>
+                        ${p.active
+                          ? html`
+                              <form method="post" action="/admin/properties/${p.id}/sync" class="inline">
+                                ${csrf(c)}
+                                <button type="submit" class="secondary sm">同期</button>
+                              </form>
+                            `
+                          : raw("")}
+                      </td>
                     </tr>
                   `,
                 )}
               </tbody>
             </table>
-            <p class="muted sm">※ 同期の実行は P3 で追加します。</p>
           `}
+
+      ${syncLogs.length > 0
+        ? html`
+            <h2 class="sub">最近の同期ログ</h2>
+            <table class="tbl">
+              <thead>
+                <tr><th>日時</th><th>物件</th><th>結果</th><th>件数</th><th>メモ</th></tr>
+              </thead>
+              <tbody>
+                ${syncLogs.map(
+                  (l) => html`
+                    <tr>
+                      <td class="sm">${fmtDateTimeJst(l.run_at)}</td>
+                      <td class="sm">${l.property || html`<span class="muted">—</span>`}</td>
+                      <td>
+                        <span class="status-${l.result === "ok" ? "done" : "in_progress"}">
+                          ${l.result === "ok" ? "OK" : "エラー"}
+                        </span>
+                      </td>
+                      <td class="sm">見 ${l.reservations_seen} / 生成 ${l.cleanings_created} / 更新 ${l.cleanings_updated}</td>
+                      <td class="sm">${l.message || ""}</td>
+                    </tr>
+                  `,
+                )}
+              </tbody>
+            </table>
+          `
+        : raw("")}
     `,
   });
 }
