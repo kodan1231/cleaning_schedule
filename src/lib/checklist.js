@@ -10,8 +10,7 @@ import { all, run } from "../db/queries.js";
 export async function snapshotChecklist(db, cleaningId, propertyId) {
   const rooms = await all(
     db,
-    `SELECT id, name, group_label, sort_order, template_id
-       FROM room WHERE property_id = ? ORDER BY sort_order, id`,
+    "SELECT id, name, sort_order, template_id FROM room WHERE property_id = ? ORDER BY sort_order, id",
     propertyId,
   );
   let n = 0;
@@ -29,11 +28,10 @@ export async function snapshotChecklist(db, cleaningId, propertyId) {
       await run(
         db,
         `INSERT INTO checklist_item
-           (cleaning_id, room_name, room_group, room_sort, sort_order, item_key, label, needs_photo, note, checked)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+           (cleaning_id, room_name, room_sort, sort_order, item_key, label, needs_photo, note, checked)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
         cleaningId,
         room.name,
-        room.group_label || null,
         room.sort_order,
         it.sort_order,
         it.item_key,
@@ -72,49 +70,20 @@ export async function resnapshotPending(db, propertyId, { force = false, include
   return done;
 }
 
-/** checklist_item を間取り別にまとめる。[{ name, group, sort, done, total, items }]（room_sort 順） */
+/** checklist_item を間取り別にまとめる。[{ name, done, total, items }]（room_sort 順） */
 export function groupByRoom(items) {
   const map = new Map();
   for (const it of items) {
-    if (!map.has(it.room_name)) {
-      map.set(it.room_name, { group: it.room_group || null, sort: it.room_sort, items: [] });
-    }
+    if (!map.has(it.room_name)) map.set(it.room_name, { sort: it.room_sort, items: [] });
     map.get(it.room_name).items.push(it);
   }
   return [...map.entries()]
     .map(([name, v]) => ({
       name,
-      group: v.group,
       sort: v.sort,
       items: v.items,
       done: v.items.filter((i) => i.checked).length,
       total: v.items.length,
     }))
     .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
-}
-
-/**
- * 間取りをグループ（階など）でまとめる。
- * グループ未設定の間取りは group:null のセクションにまとめて末尾へ。
- * @returns [{ group, done, total, rooms:[room...] }]
- */
-export function groupByFloor(rooms) {
-  const map = new Map();
-  for (const r of rooms) {
-    const key = r.group || "";
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(r);
-  }
-  const sections = [...map.entries()].map(([key, rs]) => ({
-    group: key || null,
-    rooms: rs,
-    done: rs.reduce((s, r) => s + r.done, 0),
-    total: rs.reduce((s, r) => s + r.total, 0),
-  }));
-  // グループありを先、未設定を末尾に。グループ内は room_sort 順（rooms は既にソート済み）
-  return sections.sort((a, b) => {
-    if (!a.group && b.group) return 1;
-    if (a.group && !b.group) return -1;
-    return 0;
-  });
 }

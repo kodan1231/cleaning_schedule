@@ -1,7 +1,7 @@
 import { html, raw } from "../lib/html.js";
 import { authedPage } from "./layout.js";
 import { fmtDateJst, fmtDateTimeJst, todayJst, daysBetween } from "../lib/datetime.js";
-import { groupByRoom, groupByFloor } from "../lib/checklist.js";
+import { groupByRoom } from "../lib/checklist.js";
 import { workDurationMs, fmtDuration } from "../lib/events.js";
 
 const EVENT_LABEL = {
@@ -321,21 +321,7 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
         ? html`<div class="card muted">
             この清掃にはチェック項目がありません（物件に間取り／テンプレート未設定）。
           </div>`
-        : groupByFloor(rooms).map((section) =>
-            section.group
-              ? html`
-                  <details class="floor" data-floor="${section.group}">
-                    <summary class="floor-sum">
-                      <span>${section.group}</span>
-                      <span class="muted sm" data-floor-prog="${section.group}">
-                        ${section.done}/${section.total}
-                      </span>
-                    </summary>
-                    ${section.rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem))}
-                  </details>
-                `
-              : html`${section.rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem))}`,
-          )}
+        : rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem))}
       ${total && !editable
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
         : raw("")}

@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS room (
   id          INTEGER PRIMARY KEY,
   property_id INTEGER NOT NULL REFERENCES property(id) ON DELETE CASCADE,
   name        TEXT    NOT NULL,
-  group_label TEXT,                       -- 階など（例「1階」）。表示の折りたたみ用・任意
+  group_label TEXT,                       -- 未使用（旧・階グループ。0004 で追加、間取りごとの折りたたみ導入で廃止）
   sort_order  INTEGER NOT NULL DEFAULT 0,
   template_id INTEGER REFERENCES checklist_template(id),
   created_at  TEXT    NOT NULL
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS checklist_item (
   id          INTEGER PRIMARY KEY,
   cleaning_id INTEGER NOT NULL REFERENCES cleaning(id) ON DELETE CASCADE,
   room_name   TEXT    NOT NULL,           -- 間取り名（スナップショット時点）
-  room_group  TEXT,                       -- 間取りのグループ名（階など）
+  room_group  TEXT,                       -- 未使用（旧・階グループ。0004 で追加、廃止）
   room_sort   INTEGER NOT NULL DEFAULT 0,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   item_key    TEXT    NOT NULL,

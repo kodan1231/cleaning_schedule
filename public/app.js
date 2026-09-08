@@ -71,19 +71,6 @@ document.addEventListener("submit", async (ev) => {
     // 全部チェック済みの間取りは自動で閉じる（未完了に戻ったら開いたまま）
     const block = li.closest(".room-block");
     if (block && roomDone) block.open = false;
-    // 階の進捗と自動折りたたみ
-    const floor = block && block.closest(".floor");
-    if (floor) {
-      const progs = [...floor.querySelectorAll("[data-room-prog]")].map((el) => {
-        const m = el.textContent.match(/(\d+)\s*\/\s*(\d+)/);
-        return m ? [+m[1], +m[2]] : [0, 0];
-      });
-      const fd = progs.reduce((s, p) => s + p[0], 0);
-      const ft = progs.reduce((s, p) => s + p[1], 0);
-      const fp = floor.querySelector("[data-floor-prog]");
-      if (fp) fp.textContent = `${fd}/${ft}`;
-      if (ft > 0) floor.open = !(fd === ft);
-    }
 
     // 完了フォームの未チェック件数
     const cf = document.querySelector("[data-complete-form]");
