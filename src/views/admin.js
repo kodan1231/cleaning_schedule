@@ -18,6 +18,13 @@ function backLink(href, label) {
   return html`<p><a href="${href}">&larr; ${label}</a></p>`;
 }
 
+function fmtBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1e9) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1e9).toFixed(2)} GB`;
+}
+
 /** iCal URL のマスク表示（一覧用。実値は編集フォームでのみ表示） */
 export function maskUrl(u) {
   const s = String(u || "");
@@ -28,8 +35,10 @@ export function maskUrl(u) {
 // ─────────────────────────────────────────────
 // 管理トップ
 // ─────────────────────────────────────────────
-export function adminHome(c, { counts, properties, syncLogs = [], msg }) {
+export function adminHome(c, { counts, properties, syncLogs = [], storage, msg }) {
   const activeProps = properties.filter((p) => p.active).length;
+  const gb = storage ? storage.bytes / 1e9 : 0;
+  const warn = gb >= 3;
   return authedPage(c, {
     title: "管理",
     active: "admin",
@@ -43,6 +52,20 @@ export function adminHome(c, { counts, properties, syncLogs = [], msg }) {
           <a class="btn secondary" href="/admin/users">ユーザー (${counts.users})</a>
         </div>
       </div>
+
+      ${storage
+        ? html`
+            <div class="card ${warn ? "err" : ""}">
+              <p class="${warn ? "" : "muted"}">
+                写真: ${storage.photos}枚 / 約 ${fmtBytes(storage.bytes)}
+                <span class="muted sm">（D1 無料枠 5GB・上限 10GB）</span>
+              </p>
+              ${warn
+                ? html`<p class="sm"><strong>3GB を超えました。R2 への移行を検討してください（docs/02 §7.4）。</strong></p>`
+                : raw("")}
+            </div>
+          `
+        : raw("")}
 
       <h2 class="sub">物件の同期状況</h2>
       ${properties.length === 0

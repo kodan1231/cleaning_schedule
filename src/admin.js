@@ -58,7 +58,12 @@ admin.get("/", async (c) => {
      FROM sync_log s LEFT JOIN property p ON p.id = s.property_id
      ORDER BY s.run_at DESC LIMIT 15`,
   );
-  return adminHome(c, { counts, properties, syncLogs, msg: c.req.query("msg") });
+  const storage = await one(
+    db,
+    `SELECT (SELECT COUNT(*) FROM photo) AS photos,
+            (SELECT COALESCE(SUM(LENGTH(bytes)), 0) FROM photo_blob) AS bytes`,
+  );
+  return adminHome(c, { counts, properties, syncLogs, storage, msg: c.req.query("msg") });
 });
 
 // ── 同期の手動実行 ──

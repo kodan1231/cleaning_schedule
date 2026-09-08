@@ -206,6 +206,9 @@ button[disabled] { opacity: 0.4; cursor: not-allowed; }
 .form-row button { flex: none; }
 .filter { padding: 12px 14px; }
 .filter .fld { margin: 0; }
+.filter-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 480px) { .filter-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.filter-form button { align-self: flex-start; }
 
 .overdue-banner {
   display: block;

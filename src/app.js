@@ -7,6 +7,7 @@ import { loginPage, registerPage } from "./views/auth.js";
 import { admin } from "./admin.js";
 import { dashboard, cleanings } from "./cleanings.js";
 import { photos } from "./photos.js";
+import { history } from "./history.js";
 import { one, run, getMeta, ping } from "./db/queries.js";
 import {
   hashPin,
@@ -195,6 +196,7 @@ app.post("/logout", async (c) => {
 app.get("/", requireAuth(), dashboard);
 app.route("/cleanings", cleanings);
 app.route("/photos", photos);
+app.route("/history", history);
 
 // ─────────────────────────────────────────────
 // 管理（物件・テンプレート・ユーザー管理）
@@ -210,7 +212,13 @@ app.notFound((c) =>
     {
       title: "ページが見つかりません",
       appName: c.env.APP_NAME,
-      body: html`<h1>404</h1><p class="muted">ページが見つかりません。</p><p><a href="/">トップへ</a></p>`,
+      body: html`
+        <h1>ページが見つかりません</h1>
+        <div class="card muted">
+          お探しのページは移動または削除された可能性があります。
+        </div>
+        <p><a class="btn secondary" href="/">清掃カレンダーへ</a></p>
+      `,
     },
     404,
   ),
@@ -223,7 +231,13 @@ app.onError((err, c) => {
     {
       title: "エラー",
       appName: c.env.APP_NAME,
-      body: html`<h1>エラーが発生しました</h1><p class="muted">時間をおいて再度お試しください。</p>`,
+      body: html`
+        <h1>エラーが発生しました</h1>
+        <div class="card muted">
+          時間をおいて再度お試しください。繰り返す場合は管理者にお知らせください。
+        </div>
+        <p><a class="btn secondary" href="/">清掃カレンダーへ</a></p>
+      `,
     },
     500,
   );
