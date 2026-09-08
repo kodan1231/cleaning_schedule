@@ -4,6 +4,7 @@
 
 import { all, one, run } from "../db/queries.js";
 import { nowIso, todayJst, addDays } from "../lib/datetime.js";
+import { snapshotChecklist } from "../lib/checklist.js";
 import { parseEvents, classifyEvent } from "./parser.js";
 
 const UA = "cleaning-schedule/1.0 (+https://cleaning-schedule.kodan1231.workers.dev)";
@@ -194,32 +195,6 @@ async function ensureCleaning(db, prop, reservationId, checkoutDate) {
   );
   await snapshotChecklist(db, meta.last_row_id, prop.template_id);
   return true;
-}
-
-/** テンプレ項目を checklist_item にコピー（FR-10。以後テンプレ変更の影響を受けない） */
-async function snapshotChecklist(db, cleaningId, templateId) {
-  if (!templateId) return;
-  const items = await all(
-    db,
-    `SELECT area_label, sort_order, item_key, label, needs_photo, note
-     FROM checklist_template_item WHERE template_id = ? ORDER BY area_label, sort_order, id`,
-    templateId,
-  );
-  for (const it of items) {
-    await run(
-      db,
-      `INSERT INTO checklist_item
-         (cleaning_id, area_label, sort_order, item_key, label, needs_photo, note, checked)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-      cleaningId,
-      it.area_label,
-      it.sort_order,
-      it.item_key,
-      it.label,
-      it.needs_photo,
-      it.note,
-    );
-  }
 }
 
 /** 日程変更: 未完了(pending/in_progress)の清掃だけ clean_date を更新。動かした件数を返す */

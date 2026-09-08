@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { html } from "./lib/html.js";
 import { nowIso, isoPlusMinutes } from "./lib/datetime.js";
-import { page, authedPage } from "./views/layout.js";
+import { page } from "./views/layout.js";
 import { loginPage, registerPage } from "./views/auth.js";
 import { admin } from "./admin.js";
+import { dashboard, cleanings } from "./cleanings.js";
 import { one, all, run, getMeta, setMeta, ping } from "./db/queries.js";
 import {
   hashPin,
@@ -195,25 +196,10 @@ app.post("/logout", async (c) => {
 });
 
 // ─────────────────────────────────────────────
-// ダッシュボード（P3 で清掃一覧に拡張）
+// 清掃（ダッシュボード / 詳細 / 状態遷移 / 臨時清掃）
 // ─────────────────────────────────────────────
-app.get("/", requireAuth(), (c) => {
-  const user = c.get("user");
-  return authedPage(c, {
-    title: "清掃",
-    active: "home",
-    body: html`
-      <h1>清掃予定</h1>
-      <div class="card muted">
-        まだ表示できる清掃予定がありません。<br />
-        （P3: iCal 同期で自動生成されます）
-      </div>
-      ${user.role === "admin"
-        ? html`<p><a class="btn secondary" href="/admin">管理メニュー</a></p>`
-        : ""}
-    `,
-  });
-});
+app.get("/", requireAuth(), dashboard);
+app.route("/cleanings", cleanings);
 
 // ─────────────────────────────────────────────
 // 管理（物件・テンプレート・ユーザー管理）

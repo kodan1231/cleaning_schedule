@@ -179,3 +179,50 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 button.sm, .btn.sm { padding: 6px 10px; min-height: 36px; font-size: 13px; }
 button.danger, .btn.danger { border-color: #d9534f; color: #b02a24; }
 button[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+/* 清掃カード / 詳細 */
+.filter { padding: 12px 14px; }
+.filter .fld { margin: 0; }
+
+.clist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.ccard {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--gray);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: var(--text);
+}
+.ccard.status-in_progress { border-left-color: var(--orange); }
+.ccard.status-done { border-left-color: var(--green); }
+.ccard.overdue { border-left-color: #d9534f; }
+.ccard-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ccard-row + .ccard-row { margin-top: 4px; }
+.cdate { font-weight: 700; }
+.cprop { font-size: 14px; }
+.cprog { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+
+.badge.status-pending { background: var(--line); color: var(--muted); }
+.badge.status-in_progress { background: #fbeee0; color: var(--orange); }
+.badge.status-done { background: #e5f0ea; color: var(--green-d); }
+.badge.status-cancelled { background: #fdecea; color: #b02a24; }
+
+.detail-line { margin: 4px 0; }
+.detail-line:first-child { margin-top: 0; }
+
+.items.ro { list-style: none; margin: 0; padding: 0; }
+.items.ro li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.items.ro li:first-child { border-top: none; }
+.items.ro li.on .lbl { color: var(--muted); text-decoration: line-through; }
+.items.ro .mark { width: 18px; text-align: center; color: var(--gray); }
+.items.ro li.on .mark { color: var(--green); }
+.items.ro .lbl { flex: 1; }
