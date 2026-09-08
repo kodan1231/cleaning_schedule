@@ -84,7 +84,12 @@ document.addEventListener("submit", async (ev) => {
     }
   } catch (e) {
     console.warn("トグル失敗", e);
-    alert("更新に失敗しました。通信状況を確認してください。");
+    // アラートは出さない（連続タップの邪魔になる）。行を一瞬赤くして知らせる。
+    const li = form.closest("li");
+    if (li) {
+      li.classList.add("chk-failed");
+      setTimeout(() => li.classList.remove("chk-failed"), 1500);
+    }
   } finally {
     btn.disabled = false;
   }

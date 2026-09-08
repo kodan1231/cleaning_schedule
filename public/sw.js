@@ -1,10 +1,14 @@
-// Service Worker（P7）。
-// - install: アプリシェルをプリキャッシュ
-// - 静的資産（CSS/JS/アイコン/manifest）: cache-first
-// - 画面遷移・API: network-first（失敗時 キャッシュ → オフラインページ）
+// Service Worker。
+// - install: オフライン用にアプリシェルをプリキャッシュ
+// - app.js / app.css / manifest / 画面遷移 / API: network-first
+//   （オンライン時は必ず最新。失敗時のみキャッシュ → オフラインページ）
+// - アイコン・フォント等の不変資産: cache-first
 // - 写真 /photos/*: stale-while-revalidate（件数上限で古いものから破棄）
+//
+// 注意: app.js / app.css を cache-first にすると、デプロイしても古い JS/CSS が
+// 使われ続けて不整合になる（過去にトグルが毎回失敗する不具合の原因）。必ず network-first。
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = `shell-${VERSION}`;
 const RUNTIME = `runtime-${VERSION}`;
 const PHOTOS = `photos-${VERSION}`;
@@ -18,7 +22,8 @@ const SHELL_ASSETS = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];
-const STATIC_EXT = /\.(css|js|png|jpg|jpeg|svg|webmanifest|ico|woff2?)$/i;
+// 内容がファイル名で固定される不変資産だけ cache-first
+const IMMUTABLE = /\.(png|jpe?g|svg|ico|webp|woff2?)$/i;
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
@@ -52,11 +57,11 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(staleWhileRevalidate(request));
     return;
   }
-  if (STATIC_EXT.test(url.pathname)) {
+  if (IMMUTABLE.test(url.pathname)) {
     e.respondWith(cacheFirst(request));
     return;
   }
-  // 画面遷移・その他（API 含む）
+  // app.js / app.css / manifest / 画面遷移 / API
   e.respondWith(networkFirst(request));
 });
 
@@ -82,7 +87,10 @@ async function networkFirst(request) {
       const offline = await caches.match("/offline");
       if (offline) return offline;
     }
-    return new Response("オフラインです", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    return new Response("オフラインです", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   }
 }
 
