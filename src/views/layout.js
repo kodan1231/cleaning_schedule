@@ -38,7 +38,7 @@ export function layout({ title, user, csrf, active, body, appName = "民泊清�
   `;
 
   return raw(`<!doctype html>
-<html lang="ja">
+<html lang="ja" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

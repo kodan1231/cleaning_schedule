@@ -228,6 +228,20 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .room-tpl { flex: 1 1 40%; min-width: 120px; font: inherit; padding: 8px 6px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); }
 .room-line button.sm, .room-line button.secondary { flex: none; }
 .room-ops { display: inline-flex; gap: 2px; margin-left: auto; }
+
+.room-grip {
+  flex: none;
+  cursor: grab;
+  color: var(--gray);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 2px;
+  touch-action: none;
+  user-select: none;
+}
+.no-js .room-grip { display: none; }
+.js .room-move { display: none; }
+.room-line.dragging { opacity: 0.6; background: #eef6f1; border-radius: 8px; }
 .linkbtn {
   background: none;
   border: 1px solid var(--line);

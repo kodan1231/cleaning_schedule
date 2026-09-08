@@ -246,8 +246,9 @@ export function newPropertyPage(c, { err } = {}) {
 // ─────────────────────────────────────────────
 function roomRow(c, propertyId, r, templates, idx, total) {
   return html`
-    <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="room-line">
+    <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="room-line" data-room-id="${r.id}">
       ${csrf(c)}
+      <span class="room-grip" aria-hidden="true" title="ドラッグで並べ替え">⠿</span>
       <input class="room-name" type="text" name="name" value="${r.name}" maxlength="40" required />
       <select name="template_id" class="room-tpl">
         <option value="">テンプレ未割当</option>
@@ -262,9 +263,9 @@ function roomRow(c, propertyId, r, templates, idx, total) {
       <button type="submit" class="secondary sm" title="保存">保存</button>
       <span class="room-ops">
         <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
-          name="dir" value="up" class="linkbtn" ${idx === 0 ? "disabled" : ""}>↑</button>
+          name="dir" value="up" class="linkbtn room-move" ${idx === 0 ? "disabled" : ""}>↑</button>
         <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
-          name="dir" value="down" class="linkbtn" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+          name="dir" value="down" class="linkbtn room-move" ${idx === total - 1 ? "disabled" : ""}>↓</button>
         <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/delete"
           class="linkbtn danger" onclick="return confirm('この間取りを削除しますか？')">✕</button>
       </span>
@@ -294,10 +295,13 @@ export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
         ${roomsMissingTpl ? html`<br /><strong style="color:var(--orange)">テンプレ未割当の間取りが ${roomsMissingTpl} 室あります。</strong>` : raw("")}
       </p>
 
-      <div class="card room-list">
-        ${rooms.length === 0
-          ? html`<p class="muted sm">まだ間取りがありません。</p>`
-          : rooms.map((r, i) => roomRow(c, p.id, r, templates, i, rooms.length))}
+      <div class="card room-list" data-reorder-url="/admin/properties/${p.id}/rooms/reorder">
+        <div class="room-sortable">
+          ${rooms.length === 0
+            ? html`<p class="muted sm">まだ間取りがありません。</p>`
+            : rooms.map((r, i) => roomRow(c, p.id, r, templates, i, rooms.length))}
+        </div>
+        <input type="hidden" name="_csrf" value="${c.get("csrf")}" data-reorder-csrf />
         <form method="post" action="/admin/properties/${p.id}/rooms" class="room-line room-add">
           ${csrf(c)}
           <input class="room-name" type="text" name="name" maxlength="40" placeholder="間取り名（例: キッチン）" required />
@@ -310,6 +314,9 @@ export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
           <button type="submit" class="sm">追加</button>
         </form>
       </div>
+      ${rooms.length > 1
+        ? html`<p class="muted sm">間取りは <span class="room-dnd-hint">↑↓ で並べ替え</span> できます。</p>`
+        : raw("")}
       <p class="muted sm">
         テンプレートは <a href="/admin/templates">テンプレート管理</a> で作成・編集します。
       </p>

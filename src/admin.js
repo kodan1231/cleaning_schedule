@@ -237,6 +237,27 @@ admin.post("/properties/:id/rooms", async (c) => {
   return c.redirect(to(`/admin/properties/${id}`, "間取りを追加しました"));
 });
 
+// ドラッグ&ドロップ並べ替え（JS。body.order = "id,id,id"）。:rid ルートより前に登録
+admin.post("/properties/:id/rooms/reorder", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const wantsJson = (c.req.header("accept") || "").includes("application/json");
+  const ids = String(body.order || "")
+    .split(",")
+    .map((s) => parseInt(s, 10))
+    .filter((n) => Number.isInteger(n));
+  const rooms = await all(c.env.DB, "SELECT id FROM room WHERE property_id = ?", id);
+  const valid = new Set(rooms.map((r) => r.id));
+  if (ids.length !== rooms.length || !ids.every((n) => valid.has(n))) {
+    return wantsJson ? c.json({ ok: false }, 400) : c.redirect(`/admin/properties/${id}`);
+  }
+  for (let i = 0; i < ids.length; i++) {
+    await run(c.env.DB, "UPDATE room SET sort_order = ? WHERE id = ?", i + 1, ids[i]);
+  }
+  return wantsJson ? c.json({ ok: true }) : c.redirect(`/admin/properties/${id}`);
+});
+
 admin.post("/properties/:id/rooms/:rid", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
   const rid = parseInt(c.req.param("rid"), 10);
