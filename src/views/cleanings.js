@@ -197,7 +197,7 @@ export function dashboardPage(c, opts) {
 // ─────────────────────────────────────────────
 // S-03 清掃詳細
 // ─────────────────────────────────────────────
-export function cleaningDetailPage(c, { cleaning: cl, items, events = [], msg }) {
+export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos = [], msg }) {
   const areas = groupByArea(items);
   const total = items.length;
   const doneN = items.filter((i) => i.checked).length;
@@ -207,6 +207,17 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], msg })
   const hasStarted = events.some((e) => e.kind === "start");
   const durationMs = workDurationMs(events);
   const running = cl.status === "in_progress";
+
+  const photosByItem = new Map();
+  const cleaningPhotos = [];
+  for (const p of photos) {
+    if (p.checklist_item_id) {
+      if (!photosByItem.has(p.checklist_item_id)) photosByItem.set(p.checklist_item_id, []);
+      photosByItem.get(p.checklist_item_id).push(p);
+    } else {
+      cleaningPhotos.push(p);
+    }
+  }
 
   return authedPage(c, {
     title: cl.property_name,
@@ -269,7 +280,9 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], msg })
                   </span>
                 </h3>
                 <ul class="items">
-                  ${a.items.map((it) => checkItem(c, cl, it, editable))}
+                  ${a.items.map((it) =>
+                    checkItem(c, cl, it, editable, photosByItem.get(it.id) || []),
+                  )}
                 </ul>
               </div>
             `,
@@ -277,6 +290,14 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], msg })
       ${total && !editable
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
         : raw("")}
+
+      <h2 class="sub">写真 <span class="muted sm">${photos.length}枚</span></h2>
+      <div class="card">
+        ${cleaningPhotos.length
+          ? photoStrip(cleaningPhotos)
+          : html`<p class="muted sm">清掃全体の写真はまだありません。</p>`}
+        ${editable ? uploadWidget(c, cl.id, null) : raw("")}
+      </div>
 
       ${events.length
         ? html`
@@ -317,17 +338,29 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], msg })
   });
 }
 
-function checkItem(c, cl, it, editable) {
+function checkItem(c, cl, it, editable, itemPhotos = []) {
   const inner = html`
     <span class="mark">${it.checked ? "✓" : "○"}</span>
     <span class="lbl">${it.label}</span>
-    ${it.needs_photo ? html`<span class="badge photo">写真必須</span>` : raw("")}
+    ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
     ${it.checked && it.checked_by_name
       ? html`<span class="by muted sm">${it.checked_by_name}</span>`
       : raw("")}
   `;
+  const media =
+    itemPhotos.length || editable
+      ? html`
+          <div class="item-media">
+            ${itemPhotos.length ? photoStrip(itemPhotos) : raw("")}
+            ${editable ? uploadWidget(c, cl.id, it.id) : raw("")}
+          </div>
+        `
+      : raw("");
+
   if (!editable) {
-    return html`<li class="ro ${it.checked ? "on" : ""}" data-area="${it.area_label}">${inner}</li>`;
+    return html`<li class="ro ${it.checked ? "on" : ""}" data-area="${it.area_label}">
+      ${inner}${media}
+    </li>`;
   }
   return html`
     <li class="${it.checked ? "on" : ""}" data-area="${it.area_label}">
@@ -337,7 +370,43 @@ function checkItem(c, cl, it, editable) {
           ${inner}
         </button>
       </form>
+      ${media}
     </li>
+  `;
+}
+
+function photoStrip(list) {
+  return html`
+    <div class="photos">
+      ${list.map(
+        (p) => html`
+          <a class="thumb" href="/photos/${p.id}?view=1">
+            <img src="/photos/${p.id}?thumb=1" alt="${p.caption || "写真"}" loading="lazy" />
+          </a>
+        `,
+      )}
+    </div>
+  `;
+}
+
+function uploadWidget(c, cleaningId, itemId) {
+  return html`
+    <form
+      class="photo-form"
+      method="post"
+      action="/cleanings/${cleaningId}/photos"
+      enctype="multipart/form-data"
+      data-cleaning="${cleaningId}"
+      ${itemId ? html`data-item="${itemId}"` : raw("")}
+    >
+      ${csrf(c)}
+      ${itemId ? html`<input type="hidden" name="item_id" value="${itemId}" />` : raw("")}
+      <label class="photo-btn">
+        <input type="file" name="full" accept="image/*" />
+        <span>＋ 写真を追加</span>
+      </label>
+      <noscript><button type="submit" class="secondary sm">アップロード</button></noscript>
+    </form>
   `;
 }
 

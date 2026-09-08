@@ -14,6 +14,7 @@ import {
 } from "./lib/datetime.js";
 import { snapshotChecklist } from "./lib/checklist.js";
 import { logEvent } from "./lib/events.js";
+import { uploadPhoto, loadPhotos } from "./photos.js";
 import { dashboardPage, cleaningDetailPage, newCleaningPage } from "./views/cleanings.js";
 
 async function form(c) {
@@ -190,8 +191,11 @@ cleanings.get("/:id", async (c) => {
      WHERE e.cleaning_id = ? ORDER BY e.at ASC, e.id ASC`,
     id,
   );
-  return cleaningDetailPage(c, { cleaning, items, events, msg: c.req.query("msg") });
+  const photos = await loadPhotos(c.env.DB, id);
+  return cleaningDetailPage(c, { cleaning, items, events, photos, msg: c.req.query("msg") });
 });
+
+cleanings.post("/:id/photos", uploadPhoto);
 
 // ── 状態遷移 ──
 async function transition(c, { from: fromStatus, set, kind, okMsg, busyMsg }) {

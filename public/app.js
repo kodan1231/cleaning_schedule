@@ -96,3 +96,79 @@ document.addEventListener("submit", (ev) => {
 function cssEscape(s) {
   return String(s).replace(/["\\]/g, "\\$&");
 }
+
+// ── 写真アップロード（クライアント縮小 → fetch）──
+document.addEventListener("change", async (ev) => {
+  const input = ev.target;
+  if (!input.matches(".photo-form input[type=file]")) return;
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const form = input.closest(".photo-form");
+  const label = form.querySelector(".photo-btn span");
+  const orig = label ? label.textContent : "";
+  if (label) label.textContent = "処理中…";
+  form.classList.add("busy");
+
+  try {
+    const full = await makeJpeg(file, 1600, [0.82, 0.7, 0.6, 0.5], 1450000);
+    const thumb = await makeJpeg(file, 400, [0.7], 300000);
+    const fd = new FormData();
+    fd.set("_csrf", form.querySelector('input[name=_csrf]').value);
+    const itemId = form.dataset.item;
+    if (itemId) fd.set("item_id", itemId);
+    fd.set("full", full, "photo.jpg");
+    fd.set("thumb", thumb, "thumb.jpg");
+    if (label) label.textContent = "アップロード中…";
+    const res = await fetch(form.action, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: fd,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
+    location.reload();
+  } catch (e) {
+    console.warn("写真アップロード失敗", e);
+    alert("写真のアップロードに失敗しました: " + (e.message || e));
+    if (label) label.textContent = orig;
+    form.classList.remove("busy");
+    input.value = "";
+  }
+});
+
+function loadImage(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      res(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      rej(new Error("画像を読み込めません"));
+    };
+    img.src = url;
+  });
+}
+
+async function makeJpeg(file, maxEdge, qualities, sizeCap) {
+  const img = await loadImage(file);
+  const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * scale));
+  const h = Math.max(1, Math.round(img.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  const toBlob = (q) => new Promise((r) => canvas.toBlob(r, "image/jpeg", q));
+  let blob = null;
+  for (const q of qualities) {
+    blob = await toBlob(q);
+    if (blob && (!sizeCap || blob.size <= sizeCap)) return blob;
+  }
+  return blob;
+}

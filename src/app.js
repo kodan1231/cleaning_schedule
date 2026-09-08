@@ -6,6 +6,7 @@ import { page } from "./views/layout.js";
 import { loginPage, registerPage } from "./views/auth.js";
 import { admin } from "./admin.js";
 import { dashboard, cleanings } from "./cleanings.js";
+import { photos } from "./photos.js";
 import { one, run, getMeta, ping } from "./db/queries.js";
 import {
   hashPin,
@@ -193,6 +194,7 @@ app.post("/logout", async (c) => {
 // ─────────────────────────────────────────────
 app.get("/", requireAuth(), dashboard);
 app.route("/cleanings", cleanings);
+app.route("/photos", photos);
 
 // ─────────────────────────────────────────────
 // 管理（物件・テンプレート・ユーザー管理）
