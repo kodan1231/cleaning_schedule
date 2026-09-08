@@ -143,7 +143,6 @@ cleanings.post("/new", async (c) => {
       err: errs.join(" / "),
     });
   }
-  const full = await one(c.env.DB, "SELECT template_id FROM property WHERE id = ?", propertyId);
   const meta = await run(
     c.env.DB,
     `INSERT INTO cleaning (property_id, reservation_id, clean_date, source, status, created_at)
@@ -152,7 +151,7 @@ cleanings.post("/new", async (c) => {
     cleanDate,
     nowIso(),
   );
-  await snapshotChecklist(c.env.DB, meta.last_row_id, full?.template_id);
+  await snapshotChecklist(c.env.DB, meta.last_row_id, propertyId);
   return c.redirect(to(`/cleanings/${meta.last_row_id}`, "臨時清掃を追加しました"));
 });
 
@@ -181,7 +180,7 @@ cleanings.get("/:id", async (c) => {
     `SELECT i.*, u.name AS checked_by_name
      FROM checklist_item i
      LEFT JOIN user u ON u.id = i.checked_by
-     WHERE i.cleaning_id = ? ORDER BY i.area_label, i.sort_order, i.id`,
+     WHERE i.cleaning_id = ? ORDER BY i.room_sort, i.room_name, i.sort_order, i.id`,
     id,
   );
   const events = await all(
@@ -319,21 +318,21 @@ cleanings.post("/:id/items/:iid/toggle", async (c) => {
 
   const items = await all(
     c.env.DB,
-    "SELECT area_label, checked FROM checklist_item WHERE cleaning_id = ?",
+    "SELECT room_name, checked FROM checklist_item WHERE cleaning_id = ?",
     id,
   );
-  const row = await one(c.env.DB, "SELECT area_label FROM checklist_item WHERE id = ?", iid);
-  const area = row?.area_label;
-  const areaItems = items.filter((x) => x.area_label === area);
+  const row = await one(c.env.DB, "SELECT room_name FROM checklist_item WHERE id = ?", iid);
+  const room = row?.room_name;
+  const roomItems = items.filter((x) => x.room_name === room);
   return c.json({
     ok: true,
     checked: now,
     checkedBy: now ? c.get("user").name : null,
     overall: { done: items.filter((x) => x.checked).length, total: items.length },
-    area: {
-      label: area,
-      done: areaItems.filter((x) => x.checked).length,
-      total: areaItems.length,
+    room: {
+      name: room,
+      done: roomItems.filter((x) => x.checked).length,
+      total: roomItems.length,
     },
   });
 });

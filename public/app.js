@@ -57,10 +57,10 @@ document.addEventListener("submit", async (ev) => {
     }
 
     // 進捗
-    const areaEl = document.querySelector(
-      `[data-area-prog="${cssEscape(data.area.label)}"]`,
+    const roomEl = document.querySelector(
+      `[data-room-prog="${cssEscape(data.room.name)}"]`,
     );
-    if (areaEl) areaEl.textContent = `${data.area.done}/${data.area.total}`;
+    if (roomEl) roomEl.textContent = `${data.room.done}/${data.room.total}`;
     const overallEl = document.querySelector("[data-overall]");
     if (overallEl) overallEl.textContent = `${data.overall.done}/${data.overall.total}`;
 

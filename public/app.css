@@ -192,6 +192,8 @@ button[disabled] { opacity: 0.4; cursor: not-allowed; }
 }
 
 .user-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.room-row .form { margin-bottom: 8px; }
+.room-row .row-actions { margin-top: 0; }
 .form-row { display: flex; gap: 6px; margin: 8px 0; }
 .form-row input {
   flex: 1;

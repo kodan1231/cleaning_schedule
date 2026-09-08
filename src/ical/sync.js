@@ -40,7 +40,7 @@ export async function syncProperty(env, propertyId) {
   const db = env.DB;
   const prop = await one(
     db,
-    "SELECT id, name, ical_url, template_id FROM property WHERE id = ?",
+    "SELECT id, name, ical_url FROM property WHERE id = ?",
     propertyId,
   );
   if (!prop) throw new Error("物件が見つかりません");
@@ -193,7 +193,7 @@ async function ensureCleaning(db, prop, reservationId, checkoutDate) {
     checkoutDate,
     nowIso(),
   );
-  await snapshotChecklist(db, meta.last_row_id, prop.template_id);
+  await snapshotChecklist(db, meta.last_row_id, prop.id);
   return true;
 }
 

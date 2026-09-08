@@ -1,7 +1,7 @@
 import { html, raw } from "../lib/html.js";
 import { authedPage } from "./layout.js";
 import { fmtDateJst, fmtDateTimeJst, todayJst } from "../lib/datetime.js";
-import { groupByArea } from "../lib/checklist.js";
+import { groupByRoom } from "../lib/checklist.js";
 import { workDurationMs, fmtDuration } from "../lib/events.js";
 
 const EVENT_LABEL = {
@@ -198,7 +198,7 @@ export function dashboardPage(c, opts) {
 // S-03 清掃詳細
 // ─────────────────────────────────────────────
 export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos = [], msg }) {
-  const areas = groupByArea(items);
+  const rooms = groupByRoom(items);
   const total = items.length;
   const doneN = items.filter((i) => i.checked).length;
   const incomplete = total - doneN;
@@ -269,18 +269,20 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
         ${total ? html`<span class="muted sm" data-overall>${doneN}/${total}</span>` : raw("")}
       </h2>
       ${total === 0
-        ? html`<div class="card muted">この清掃にはチェック項目がありません（物件にテンプレート未割当）。</div>`
-        : areas.map(
-            (a) => html`
+        ? html`<div class="card muted">
+            この清掃にはチェック項目がありません（物件に間取り／テンプレート未設定）。
+          </div>`
+        : rooms.map(
+            (r) => html`
               <div class="card area">
                 <h3>
-                  ${a.label}
-                  <span class="muted sm" data-area-prog="${a.label}">
-                    ${a.items.filter((i) => i.checked).length}/${a.items.length}
+                  ${r.name}
+                  <span class="muted sm" data-room-prog="${r.name}">
+                    ${r.items.filter((i) => i.checked).length}/${r.items.length}
                   </span>
                 </h3>
                 <ul class="items">
-                  ${a.items.map((it) =>
+                  ${r.items.map((it) =>
                     checkItem(c, cl, it, editable, photosByItem.get(it.id) || []),
                   )}
                 </ul>
@@ -358,12 +360,12 @@ function checkItem(c, cl, it, editable, itemPhotos = []) {
       : raw("");
 
   if (!editable) {
-    return html`<li class="ro ${it.checked ? "on" : ""}" data-area="${it.area_label}">
+    return html`<li class="ro ${it.checked ? "on" : ""}" data-room="${it.room_name}">
       ${inner}${media}
     </li>`;
   }
   return html`
-    <li class="${it.checked ? "on" : ""}" data-area="${it.area_label}">
+    <li class="${it.checked ? "on" : ""}" data-room="${it.room_name}">
       <form method="post" action="/cleanings/${cl.id}/items/${it.id}/toggle" class="chk-form">
         ${csrf(c)}
         <button type="submit" class="chk-row" aria-pressed="${it.checked ? "true" : "false"}">

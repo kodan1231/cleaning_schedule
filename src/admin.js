@@ -44,11 +44,11 @@ admin.get("/", async (c) => {
   );
   const properties = await all(
     db,
-    `SELECT p.id, p.name, p.active, t.name AS tpl,
+    `SELECT p.id, p.name, p.active,
+       (SELECT COUNT(*) FROM room r WHERE r.property_id = p.id) AS room_count,
        (SELECT s.run_at FROM sync_log s WHERE s.property_id = p.id ORDER BY s.run_at DESC LIMIT 1) AS last_sync,
        (SELECT s.result FROM sync_log s WHERE s.property_id = p.id ORDER BY s.run_at DESC LIMIT 1) AS last_result
      FROM property p
-     LEFT JOIN checklist_template t ON t.id = p.template_id
      ORDER BY p.active DESC, p.id`,
   );
   const syncLogs = await all(
@@ -105,7 +105,7 @@ admin.get("/properties", async (c) => {
 });
 
 async function loadTemplates(db) {
-  return all(db, "SELECT id, name FROM checklist_template ORDER BY is_base DESC, id");
+  return all(db, "SELECT id, name FROM checklist_template ORDER BY name, id");
 }
 
 function validateProperty(body) {
@@ -113,74 +113,155 @@ function validateProperty(body) {
   const ical_url = String(body.ical_url || "").trim();
   const checkout_time = String(body.checkout_time || "").trim();
   const note = String(body.note || "").trim();
-  let template_id = String(body.template_id || "").trim();
-  template_id = template_id === "" ? null : parseInt(template_id, 10);
   const errs = [];
   if (name.length < 1 || name.length > 60) errs.push("物件名は1〜60文字で入力してください");
   if (!/^https?:\/\//.test(ical_url) || ical_url.length > 500)
     errs.push("iCal URL は http(s) から始まる正しい URL を入力してください");
   if (!/^\d{2}:\d{2}$/.test(checkout_time)) errs.push("チェックアウト時刻を入力してください");
-  return { data: { name, ical_url, checkout_time, note, template_id }, errs };
+  return { data: { name, ical_url, checkout_time, note }, errs };
+}
+
+async function propertyDetailData(c, id, extra = {}) {
+  const p = await one(c.env.DB, "SELECT * FROM property WHERE id = ?", id);
+  if (!p) return null;
+  const rooms = await all(
+    c.env.DB,
+    `SELECT r.id, r.name, r.sort_order, r.template_id, t.name AS template_name,
+            (SELECT COUNT(*) FROM checklist_template_item i WHERE i.template_id = r.template_id) AS item_count
+     FROM room r LEFT JOIN checklist_template t ON t.id = r.template_id
+     WHERE r.property_id = ? ORDER BY r.sort_order, r.id`,
+    id,
+  );
+  const templates = await loadTemplates(c.env.DB);
+  return { p, rooms, templates, msg: c.req.query("msg"), ...extra };
 }
 
 admin.post("/properties", async (c) => {
   const body = await form(c);
   if (!body) return badReq(c);
   const { data, errs } = validateProperty(body);
-  if (errs.length) {
-    return propertyForm(c, {
-      p: null,
-      templates: await loadTemplates(c.env.DB),
-      err: errs.join(" / "),
-    });
-  }
-  await run(
+  if (errs.length) return propertyForm(c, { p: null, err: errs.join(" / ") });
+  const meta = await run(
     c.env.DB,
-    `INSERT INTO property (name, ical_url, active, checkout_time, template_id, note, created_at)
-     VALUES (?, ?, 1, ?, ?, ?, ?)`,
+    `INSERT INTO property (name, ical_url, active, checkout_time, note, created_at)
+     VALUES (?, ?, 1, ?, ?, ?)`,
     data.name,
     data.ical_url,
     data.checkout_time,
-    data.template_id,
     data.note || null,
     nowIso(),
   );
-  return c.redirect(to("/admin/properties", "物件を追加しました"));
+  return c.redirect(
+    to(`/admin/properties/${meta.last_row_id}`, "物件を追加しました。続けて間取りを登録してください"),
+  );
 });
 
 admin.get("/properties/:id", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
-  const p = await one(c.env.DB, "SELECT * FROM property WHERE id = ?", id);
-  if (!p) return c.notFound();
-  return propertyForm(c, {
-    p,
-    templates: await loadTemplates(c.env.DB),
-    msg: c.req.query("msg"),
-  });
+  const data = await propertyDetailData(c, id);
+  if (!data) return c.notFound();
+  return propertyForm(c, data);
 });
 
 admin.post("/properties/:id", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
   const body = await form(c);
   if (!body) return badReq(c);
-  const p = await one(c.env.DB, "SELECT * FROM property WHERE id = ?", id);
+  const p = await one(c.env.DB, "SELECT id FROM property WHERE id = ?", id);
   if (!p) return c.notFound();
   const { data, errs } = validateProperty(body);
   if (errs.length) {
-    return propertyForm(c, { p: { ...p, ...data }, templates: await loadTemplates(c.env.DB), err: errs.join(" / ") });
+    const d = await propertyDetailData(c, id, { err: errs.join(" / ") });
+    return propertyForm(c, { ...d, p: { ...d.p, ...data } });
   }
   await run(
     c.env.DB,
-    `UPDATE property SET name = ?, ical_url = ?, checkout_time = ?, template_id = ?, note = ?
-     WHERE id = ?`,
+    "UPDATE property SET name = ?, ical_url = ?, checkout_time = ?, note = ? WHERE id = ?",
     data.name,
     data.ical_url,
     data.checkout_time,
-    data.template_id,
     data.note || null,
     id,
   );
   return c.redirect(to(`/admin/properties/${id}`, "保存しました"));
+});
+
+// ── 間取り（部屋）──
+admin.post("/properties/:id/rooms", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const p = await one(c.env.DB, "SELECT id FROM property WHERE id = ?", id);
+  if (!p) return c.notFound();
+  const name = String(body.name || "").trim();
+  if (name.length < 1 || name.length > 40) {
+    return propertyForm(c, await propertyDetailData(c, id, { err: "間取り名は1〜40文字です" }));
+  }
+  const templateId = /^\d+$/.test(String(body.template_id)) ? parseInt(body.template_id, 10) : null;
+  const next =
+    (await one(c.env.DB, "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM room WHERE property_id = ?", id))
+      ?.n || 1;
+  await run(
+    c.env.DB,
+    "INSERT INTO room (property_id, name, sort_order, template_id, created_at) VALUES (?, ?, ?, ?, ?)",
+    id,
+    name,
+    next,
+    templateId,
+    nowIso(),
+  );
+  return c.redirect(to(`/admin/properties/${id}`, "間取りを追加しました"));
+});
+
+admin.post("/properties/:id/rooms/:rid", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const room = await one(c.env.DB, "SELECT id FROM room WHERE id = ? AND property_id = ?", rid, id);
+  if (!room) return c.notFound();
+  const name = String(body.name || "").trim();
+  if (name.length < 1 || name.length > 40) {
+    return propertyForm(c, await propertyDetailData(c, id, { err: "間取り名は1〜40文字です" }));
+  }
+  const templateId = /^\d+$/.test(String(body.template_id)) ? parseInt(body.template_id, 10) : null;
+  await run(
+    c.env.DB,
+    "UPDATE room SET name = ?, template_id = ? WHERE id = ?",
+    name,
+    templateId,
+    rid,
+  );
+  return c.redirect(to(`/admin/properties/${id}`, "間取りを保存しました"));
+});
+
+admin.post("/properties/:id/rooms/:rid/move", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const dir = body.dir === "down" ? "down" : "up";
+  const rooms = await all(
+    c.env.DB,
+    "SELECT id, sort_order FROM room WHERE property_id = ? ORDER BY sort_order, id",
+    id,
+  );
+  const idx = rooms.findIndex((r) => r.id === rid);
+  const j = dir === "up" ? idx - 1 : idx + 1;
+  if (idx >= 0 && j >= 0 && j < rooms.length) {
+    await run(c.env.DB, "UPDATE room SET sort_order = ? WHERE id = ?", rooms[j].sort_order, rooms[idx].id);
+    await run(c.env.DB, "UPDATE room SET sort_order = ? WHERE id = ?", rooms[idx].sort_order, rooms[j].id);
+  }
+  return c.redirect(`/admin/properties/${id}`);
+});
+
+admin.post("/properties/:id/rooms/:rid/delete", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  await run(c.env.DB, "DELETE FROM room WHERE id = ? AND property_id = ?", rid, id);
+  return c.redirect(to(`/admin/properties/${id}`, "間取りを削除しました"));
 });
 
 admin.post("/properties/:id/toggle", async (c) => {
@@ -196,16 +277,19 @@ admin.post("/properties/:id/toggle", async (c) => {
 // ─────────────────────────────────────────────
 // テンプレート
 // ─────────────────────────────────────────────
-admin.get("/templates", async (c) => {
-  const templates = await all(
-    c.env.DB,
-    `SELECT t.id, t.name, t.is_base,
+async function loadTemplateList(db) {
+  return all(
+    db,
+    `SELECT t.id, t.name,
        (SELECT COUNT(*) FROM checklist_template_item i WHERE i.template_id = t.id) AS items,
-       (SELECT COUNT(*) FROM property p WHERE p.template_id = t.id) AS props
+       (SELECT COUNT(*) FROM room r WHERE r.template_id = t.id) AS rooms
      FROM checklist_template t
-     ORDER BY t.is_base DESC, t.id`,
+     ORDER BY t.name, t.id`,
   );
-  return templateList(c, { templates, msg: c.req.query("msg") });
+}
+
+admin.get("/templates", async (c) => {
+  return templateList(c, { templates: await loadTemplateList(c.env.DB), msg: c.req.query("msg") });
 });
 
 admin.post("/templates", async (c) => {
@@ -213,11 +297,10 @@ admin.post("/templates", async (c) => {
   if (!body) return badReq(c);
   const name = String(body.name || "").trim();
   if (name.length < 1 || name.length > 60) {
-    const templates = await all(
-      c.env.DB,
-      `SELECT t.id, t.name, t.is_base, 0 AS items, 0 AS props FROM checklist_template t ORDER BY t.is_base DESC, t.id`,
-    );
-    return templateList(c, { templates, err: "名称は1〜60文字で入力してください" });
+    return templateList(c, {
+      templates: await loadTemplateList(c.env.DB),
+      err: "名称は1〜60文字で入力してください",
+    });
   }
   const now = nowIso();
   const meta = await run(
@@ -235,18 +318,12 @@ async function renderEditor(c, id, extra = {}) {
   if (!t) return c.notFound();
   const items = await all(
     c.env.DB,
-    "SELECT * FROM checklist_template_item WHERE template_id = ? ORDER BY area_label, sort_order, id",
+    "SELECT * FROM checklist_template_item WHERE template_id = ? ORDER BY sort_order, id",
     id,
   );
-  const map = new Map();
-  for (const it of items) {
-    if (!map.has(it.area_label)) map.set(it.area_label, []);
-    map.get(it.area_label).push(it);
-  }
-  const areas = [...map.entries()].map(([label, list]) => ({ label, items: list }));
-  const propCount =
-    (await one(c.env.DB, "SELECT COUNT(*) AS c FROM property WHERE template_id = ?", id))?.c || 0;
-  return templateEditor(c, { t, areas, propCount, msg: c.req.query("msg"), ...extra });
+  const roomCount =
+    (await one(c.env.DB, "SELECT COUNT(*) AS c FROM room WHERE template_id = ?", id))?.c || 0;
+  return templateEditor(c, { t, items, roomCount, msg: c.req.query("msg"), ...extra });
 }
 
 admin.get("/templates/:id", (c) => renderEditor(c, parseInt(c.req.param("id"), 10)));
@@ -284,16 +361,15 @@ admin.post("/templates/:id/clone", async (c) => {
   const newId = meta.last_row_id;
   const items = await all(
     c.env.DB,
-    "SELECT area_label, sort_order, label, needs_photo, note FROM checklist_template_item WHERE template_id = ?",
+    "SELECT sort_order, label, needs_photo, note FROM checklist_template_item WHERE template_id = ?",
     id,
   );
   for (const it of items) {
     await run(
       c.env.DB,
-      `INSERT INTO checklist_template_item (template_id, area_label, sort_order, item_key, label, needs_photo, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO checklist_template_item (template_id, sort_order, item_key, label, needs_photo, note)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       newId,
-      it.area_label,
       it.sort_order,
       itemKey(),
       it.label,
@@ -308,12 +384,11 @@ admin.post("/templates/:id/delete", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
   const body = await form(c);
   if (!body) return badReq(c);
-  const t = await one(c.env.DB, "SELECT * FROM checklist_template WHERE id = ?", id);
+  const t = await one(c.env.DB, "SELECT id FROM checklist_template WHERE id = ?", id);
   if (!t) return c.notFound();
-  if (t.is_base) return renderEditor(c, id, { err: "ベーステンプレートは削除できません" });
   const inUse =
-    (await one(c.env.DB, "SELECT COUNT(*) AS c FROM property WHERE template_id = ?", id))?.c || 0;
-  if (inUse > 0) return renderEditor(c, id, { err: `${inUse} 件の物件に割当中のため削除できません` });
+    (await one(c.env.DB, "SELECT COUNT(*) AS c FROM room r WHERE r.template_id = ?", id))?.c || 0;
+  if (inUse > 0) return renderEditor(c, id, { err: `${inUse} 件の間取りに割当中のため削除できません` });
   await run(c.env.DB, "DELETE FROM checklist_template_item WHERE template_id = ?", id);
   await run(c.env.DB, "DELETE FROM checklist_template WHERE id = ?", id);
   return c.redirect(to("/admin/templates", "テンプレートを削除しました"));
@@ -321,14 +396,12 @@ admin.post("/templates/:id/delete", async (c) => {
 
 // ── テンプレ項目 ──
 function validateItem(body) {
-  const area_label = String(body.area_label || "").trim();
   const label = String(body.label || "").trim();
   const note = String(body.note || "").trim();
   const needs_photo = body.needs_photo === "1" ? 1 : 0;
   const errs = [];
-  if (area_label.length < 1 || area_label.length > 40) errs.push("エリアは1〜40文字です");
   if (label.length < 1 || label.length > 120) errs.push("ラベルは1〜120文字です");
-  return { data: { area_label, label, note: note || null, needs_photo }, errs };
+  return { data: { label, note: note || null, needs_photo }, errs };
 }
 
 admin.post("/templates/:id/items", async (c) => {
@@ -342,16 +415,14 @@ admin.post("/templates/:id/items", async (c) => {
   const next =
     (await one(
       c.env.DB,
-      "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM checklist_template_item WHERE template_id = ? AND area_label = ?",
+      "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM checklist_template_item WHERE template_id = ?",
       id,
-      data.area_label,
     ))?.n || 1;
   await run(
     c.env.DB,
-    `INSERT INTO checklist_template_item (template_id, area_label, sort_order, item_key, label, needs_photo, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO checklist_template_item (template_id, sort_order, item_key, label, needs_photo, note)
+     VALUES (?, ?, ?, ?, ?, ?)`,
     id,
-    data.area_label,
     next,
     itemKey(),
     data.label,
@@ -369,32 +440,19 @@ admin.post("/templates/:id/items/:iid", async (c) => {
   if (!body) return badReq(c);
   const it = await one(
     c.env.DB,
-    "SELECT * FROM checklist_template_item WHERE id = ? AND template_id = ?",
+    "SELECT id FROM checklist_template_item WHERE id = ? AND template_id = ?",
     iid,
     id,
   );
   if (!it) return c.notFound();
   const { data, errs } = validateItem(body);
   if (errs.length) return renderEditor(c, id, { err: errs.join(" / ") });
-  // エリアが変わったら移動先の末尾に付け直す
-  let sort_order = it.sort_order;
-  if (data.area_label !== it.area_label) {
-    sort_order =
-      (await one(
-        c.env.DB,
-        "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM checklist_template_item WHERE template_id = ? AND area_label = ?",
-        id,
-        data.area_label,
-      ))?.n || 1;
-  }
   await run(
     c.env.DB,
-    "UPDATE checklist_template_item SET area_label = ?, label = ?, needs_photo = ?, note = ?, sort_order = ? WHERE id = ?",
-    data.area_label,
+    "UPDATE checklist_template_item SET label = ?, needs_photo = ?, note = ? WHERE id = ?",
     data.label,
     data.needs_photo,
     data.note,
-    sort_order,
     iid,
   );
   await touchTemplate(c.env.DB, id);
@@ -433,9 +491,8 @@ admin.post("/templates/:id/items/:iid/move", async (c) => {
   if (!it) return c.notFound();
   const siblings = await all(
     c.env.DB,
-    "SELECT id, sort_order FROM checklist_template_item WHERE template_id = ? AND area_label = ? ORDER BY sort_order, id",
+    "SELECT id, sort_order FROM checklist_template_item WHERE template_id = ? ORDER BY sort_order, id",
     id,
-    it.area_label,
   );
   const idx = siblings.findIndex((s) => s.id === iid);
   const j = dir === "up" ? idx - 1 : idx + 1;

@@ -81,7 +81,7 @@ export function adminHome(c, { counts, properties, syncLogs = [], storage, msg }
               : raw("")}
             <table class="tbl">
               <thead>
-                <tr><th>物件</th><th>テンプレ</th><th>最終同期</th><th></th></tr>
+                <tr><th>物件</th><th>間取り</th><th>最終同期</th><th></th></tr>
               </thead>
               <tbody>
                 ${properties.map(
@@ -91,7 +91,11 @@ export function adminHome(c, { counts, properties, syncLogs = [], storage, msg }
                         <a href="/admin/properties/${p.id}">${p.name}</a>
                         ${p.active ? raw("") : html`<span class="badge">無効</span>`}
                       </td>
-                      <td>${p.tpl || html`<span class="muted">未割当</span>`}</td>
+                      <td>
+                        ${p.room_count
+                          ? html`${p.room_count} 室`
+                          : html`<span class="muted">未設定</span>`}
+                      </td>
                       <td>
                         ${p.last_sync
                           ? html`${fmtDateTimeJst(p.last_sync)}
@@ -190,7 +194,7 @@ export function propertyList(c, { properties, msg }) {
 // ─────────────────────────────────────────────
 // 物件 追加/編集フォーム
 // ─────────────────────────────────────────────
-function propertyFormFields(c, { action, submit, p = {}, templates = [] }) {
+function propertyFormFields(c, { action, submit, p = {} }) {
   return html`
     <form method="post" action="${action}" class="card form">
       ${csrf(c)}
@@ -207,19 +211,6 @@ function propertyFormFields(c, { action, submit, p = {}, templates = [] }) {
         <input type="time" name="checkout_time" value="${p.checkout_time || "10:00"}" required />
       </label>
       <label class="fld">
-        チェックリストテンプレート
-        <select name="template_id">
-          <option value="">（未割当）</option>
-          ${templates.map(
-            (t) => html`
-              <option value="${t.id}" ${String(p.template_id) === String(t.id) ? "selected" : ""}>
-                ${t.name}
-              </option>
-            `,
-          )}
-        </select>
-      </label>
-      <label class="fld">
         メモ（任意）
         <textarea name="note" rows="2" maxlength="500">${p.note || ""}</textarea>
       </label>
@@ -228,7 +219,57 @@ function propertyFormFields(c, { action, submit, p = {}, templates = [] }) {
   `;
 }
 
-export function propertyForm(c, { p, templates, msg, err }) {
+function roomRow(c, propertyId, r, templates, idx, total) {
+  return html`
+    <div class="card room-row">
+      <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="form">
+        ${csrf(c)}
+        <label class="fld">
+          間取り名
+          <input type="text" name="name" value="${r.name}" maxlength="40" required />
+        </label>
+        <label class="fld">
+          チェックテンプレート
+          <select name="template_id">
+            <option value="">（未割当）</option>
+            ${templates.map(
+              (t) => html`
+                <option value="${t.id}" ${String(r.template_id) === String(t.id) ? "selected" : ""}>
+                  ${t.name}
+                </option>
+              `,
+            )}
+          </select>
+        </label>
+        <div class="row-actions">
+          <button type="submit" class="secondary sm">保存</button>
+          <span class="muted sm">
+            ${r.template_id
+              ? html`${r.item_count} 項目`
+              : html`<span style="color:var(--orange)">テンプレ未割当</span>`}
+          </span>
+        </div>
+      </form>
+      <div class="row-actions">
+        <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/move" class="inline">
+          ${csrf(c)}<input type="hidden" name="dir" value="up" />
+          <button type="submit" class="secondary sm" ${idx === 0 ? "disabled" : ""}>↑</button>
+        </form>
+        <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/move" class="inline">
+          ${csrf(c)}<input type="hidden" name="dir" value="down" />
+          <button type="submit" class="secondary sm" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+        </form>
+        <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/delete" class="inline"
+              onsubmit="return confirm('この間取りを削除しますか？')">
+          ${csrf(c)}
+          <button type="submit" class="secondary danger sm">削除</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
   return authedPage(c, {
     title: p ? p.name : "物件を追加",
     active: "admin",
@@ -240,10 +281,38 @@ export function propertyForm(c, { p, templates, msg, err }) {
         action: p ? `/admin/properties/${p.id}` : "/admin/properties",
         submit: p ? "保存する" : "追加する",
         p: p || {},
-        templates,
       })}
+
       ${p
         ? html`
+            <h2 class="sub">間取り</h2>
+            <p class="muted sm">
+              キッチン・トイレ・リビングなど、部屋ごとにチェックテンプレートを割り当てます。
+              清掃はこれらを全部まとめたチェックリストで生成されます。
+            </p>
+            ${rooms.length === 0
+              ? html`<div class="card muted">まだ間取りがありません。下から追加してください。</div>`
+              : rooms.map((r, i) => roomRow(c, p.id, r, templates, i, rooms.length))}
+
+            <form method="post" action="/admin/properties/${p.id}/rooms" class="card form">
+              ${csrf(c)}
+              <label class="fld">
+                間取り名を追加
+                <input type="text" name="name" maxlength="40" placeholder="例: キッチン" required />
+              </label>
+              <label class="fld">
+                チェックテンプレート
+                <select name="template_id">
+                  <option value="">（あとで割当）</option>
+                  ${templates.map((t) => html`<option value="${t.id}">${t.name}</option>`)}
+                </select>
+              </label>
+              <button type="submit">間取りを追加</button>
+            </form>
+            <p class="muted sm">
+              テンプレートは <a href="/admin/templates">テンプレート管理</a> で作成・編集します。
+            </p>
+
             <form method="post" action="/admin/properties/${p.id}/toggle" class="card form">
               ${csrf(c)}
               <p class="muted">
@@ -274,18 +343,15 @@ export function templateList(c, { templates, msg, err }) {
 
       <table class="tbl">
         <thead>
-          <tr><th>名称</th><th>項目数</th><th>割当物件</th></tr>
+          <tr><th>名称</th><th>項目数</th><th>使用間取り</th></tr>
         </thead>
         <tbody>
           ${templates.map(
             (t) => html`
               <tr>
-                <td>
-                  <a href="/admin/templates/${t.id}">${t.name}</a>
-                  ${t.is_base ? html`<span class="badge">ベース</span>` : raw("")}
-                </td>
+                <td><a href="/admin/templates/${t.id}">${t.name}</a></td>
                 <td>${t.items}</td>
-                <td>${t.props}</td>
+                <td>${t.rooms}</td>
               </tr>
             `,
           )}
@@ -296,7 +362,7 @@ export function templateList(c, { templates, msg, err }) {
       <form method="post" action="/admin/templates" class="card form">
         ${csrf(c)}
         <label class="fld">
-          名称
+          名称（例: キッチン用 / 浴室用）
           <input type="text" name="name" maxlength="60" required />
         </label>
         <button type="submit">追加する</button>
@@ -306,15 +372,15 @@ export function templateList(c, { templates, msg, err }) {
 }
 
 // ─────────────────────────────────────────────
-// テンプレート編集（項目の追加/編集/削除/並替）
+// テンプレート編集（項目の追加/編集/削除/並替。項目はフラットな1リスト）
 // ─────────────────────────────────────────────
-export function templateEditor(c, { t, areas, propCount, msg, err }) {
+export function templateEditor(c, { t, items = [], roomCount = 0, msg, err }) {
   return authedPage(c, {
     title: t.name,
     active: "admin",
     body: html`
       ${backLink("/admin/templates", "テンプレート一覧")}
-      <h1>${t.name} ${t.is_base ? html`<span class="badge">ベース</span>` : raw("")}</h1>
+      <h1>${t.name}</h1>
       ${flash(err, "err")}${flash(msg)}
 
       <form method="post" action="/admin/templates/${t.id}" class="card form">
@@ -334,47 +400,34 @@ export function templateEditor(c, { t, areas, propCount, msg, err }) {
         <form method="post" action="/admin/templates/${t.id}/delete" class="inline"
               onsubmit="return confirm('このテンプレートを削除しますか？')">
           ${csrf(c)}
-          <button type="submit" class="secondary danger"
-            ${t.is_base || propCount > 0 ? "disabled" : ""}>削除する</button>
+          <button type="submit" class="secondary danger" ${roomCount > 0 ? "disabled" : ""}>削除する</button>
         </form>
-        ${t.is_base
-          ? html`<span class="muted sm">ベーステンプレートは削除できません。</span>`
-          : propCount > 0
-            ? html`<span class="muted sm">${propCount} 件の物件に割当中のため削除できません。</span>`
-            : raw("")}
+        ${roomCount > 0
+          ? html`<span class="muted sm">${roomCount} 件の間取りに割当中のため削除できません。</span>`
+          : raw("")}
       </div>
 
       <h2 class="sub">項目</h2>
-      ${areas.length === 0
+      ${items.length === 0
         ? html`<div class="card muted">まだ項目がありません。下のフォームから追加してください。</div>`
-        : areas.map(
-            (a) => html`
-              <div class="card area">
-                <h3>${a.label}</h3>
-                <ul class="items">
-                  ${a.items.map((it, i) => templateItemRow(c, t.id, it, i, a.items.length))}
-                </ul>
-              </div>
-            `,
-          )}
+        : html`
+            <div class="card">
+              <ul class="items">
+                ${items.map((it, i) => templateItemRow(c, t.id, it, i, items.length))}
+              </ul>
+            </div>
+          `}
 
       <h2 class="sub">項目を追加</h2>
       <form method="post" action="/admin/templates/${t.id}/items" class="card form">
         ${csrf(c)}
-        <label class="fld">
-          エリア（部屋）
-          <input type="text" name="area_label" maxlength="40" list="area-list" required />
-        </label>
-        <datalist id="area-list">
-          ${areas.map((a) => html`<option value="${a.label}"></option>`)}
-        </datalist>
         <label class="fld">
           ラベル
           <input type="text" name="label" maxlength="120" required />
         </label>
         <label class="fld chk">
           <input type="checkbox" name="needs_photo" value="1" />
-          写真を必須にする
+          写真の目印をつける
         </label>
         <label class="fld">
           補足（任意）
@@ -392,21 +445,17 @@ function templateItemRow(c, tplId, it, idx, total) {
       <details>
         <summary>
           ${it.label}
-          ${it.needs_photo ? html`<span class="badge photo">写真必須</span>` : raw("")}
+          ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
         </summary>
         <form method="post" action="/admin/templates/${tplId}/items/${it.id}" class="form sub-form">
           ${csrf(c)}
-          <label class="fld">
-            エリア
-            <input type="text" name="area_label" value="${it.area_label}" maxlength="40" required />
-          </label>
           <label class="fld">
             ラベル
             <input type="text" name="label" value="${it.label}" maxlength="120" required />
           </label>
           <label class="fld chk">
             <input type="checkbox" name="needs_photo" value="1" ${it.needs_photo ? "checked" : ""} />
-            写真を必須にする
+            写真の目印をつける
           </label>
           <label class="fld">
             補足

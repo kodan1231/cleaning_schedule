@@ -33,9 +33,8 @@ CREATE TABLE IF NOT EXISTS property (
 );
 
 -- ─────────────────────────────────────────────
--- チェックリストテンプレート
---   is_base=1: 共通ベース（property_id=NULL）
---   物件用   : property_id を持つ
+-- チェックリストテンプレート（名前付き共有プール。「キッチン用」等）
+--   is_base / property_id は不使用（旧モデルの名残・残置）
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS checklist_template (
   id          INTEGER PRIMARY KEY,
@@ -49,7 +48,6 @@ CREATE TABLE IF NOT EXISTS checklist_template (
 CREATE TABLE IF NOT EXISTS checklist_template_item (
   id          INTEGER PRIMARY KEY,
   template_id INTEGER NOT NULL REFERENCES checklist_template(id) ON DELETE CASCADE,
-  area_label  TEXT    NOT NULL,           -- 部屋 / エリア
   sort_order  INTEGER NOT NULL DEFAULT 0,
   item_key    TEXT    NOT NULL,           -- テンプレ内で一意な安定キー
   label       TEXT    NOT NULL,
@@ -57,6 +55,19 @@ CREATE TABLE IF NOT EXISTS checklist_template_item (
   note        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tpl_item_tpl ON checklist_template_item(template_id, sort_order);
+
+-- ─────────────────────────────────────────────
+-- 間取り（部屋）: 物件 1-N。各間取りにテンプレート1つ（マイグレーション 0003）
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS room (
+  id          INTEGER PRIMARY KEY,
+  property_id INTEGER NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+  name        TEXT    NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  template_id INTEGER REFERENCES checklist_template(id),
+  created_at  TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_room_property ON room(property_id, sort_order);
 
 -- ─────────────────────────────────────────────
 -- 予約（iCal 同期結果）
@@ -98,12 +109,13 @@ CREATE INDEX IF NOT EXISTS idx_cleaning_date ON cleaning(clean_date);
 CREATE INDEX IF NOT EXISTS idx_cleaning_prop_status ON cleaning(property_id, status);
 
 -- ─────────────────────────────────────────────
--- チェック項目（テンプレからスナップショット生成）
+-- チェック項目（清掃生成時に 物件の全間取り のテンプレからスナップショット）
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS checklist_item (
   id          INTEGER PRIMARY KEY,
   cleaning_id INTEGER NOT NULL REFERENCES cleaning(id) ON DELETE CASCADE,
-  area_label  TEXT    NOT NULL,
+  room_name   TEXT    NOT NULL,           -- 間取り名（スナップショット時点）
+  room_sort   INTEGER NOT NULL DEFAULT 0,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   item_key    TEXT    NOT NULL,
   label       TEXT    NOT NULL,
@@ -113,7 +125,7 @@ CREATE TABLE IF NOT EXISTS checklist_item (
   checked_by  INTEGER REFERENCES user(id),
   checked_at  TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_item_cleaning ON checklist_item(cleaning_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_item_cleaning ON checklist_item(cleaning_id, room_sort, sort_order);
 
 -- ─────────────────────────────────────────────
 -- 作業イベントログ（実作業時間の計測・履歴。追記のみ・不変）
@@ -186,10 +198,10 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '2');
+  ('schema_version', '3');
 
--- ベーステンプレの雛形（id=1 固定。実項目は運用開始後に admin が UI で追加）
+-- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)
-VALUES (1, '標準ベース', 1, NULL,
+VALUES (1, '（サンプル）標準', 1, NULL,
         strftime('%Y-%m-%dT%H:%M:%SZ','now'),
         strftime('%Y-%m-%dT%H:%M:%SZ','now'));
