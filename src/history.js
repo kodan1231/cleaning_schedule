@@ -4,7 +4,7 @@
 import { Hono } from "hono";
 import { all } from "./db/queries.js";
 import { requireAuth } from "./auth.js";
-import { todayJst, addDays } from "./lib/datetime.js";
+import { todayJst, addDays, daysBetween } from "./lib/datetime.js";
 import { workDurationMs } from "./lib/events.js";
 import { historyPage } from "./views/history.js";
 
@@ -32,9 +32,11 @@ async function loadRows(db, { propId, from, to }) {
     db,
     `SELECT c.id, c.clean_date, c.status, c.source, c.started_at, c.completed_at,
             p.name AS property_name, cu.name AS completed_by_name, c.note,
+            r.checkin_date AS checkin_date,
             (SELECT COUNT(*) FROM photo ph WHERE ph.cleaning_id = c.id) AS photo_count
      FROM cleaning c
      JOIN property p ON p.id = c.property_id
+     LEFT JOIN reservation r ON r.id = c.reservation_id
      LEFT JOIN user cu ON cu.id = c.completed_by
      WHERE ${where.join(" AND ")}
      ORDER BY c.clean_date DESC, c.id DESC
@@ -89,6 +91,8 @@ history.get("/export.json", async (c) => {
     clean_date: r.clean_date,
     status: r.status,
     source: r.source,
+    checkin_date: r.checkin_date || "",
+    nights: r.checkin_date ? daysBetween(r.checkin_date, r.clean_date) : "",
     started_at: r.started_at,
     completed_at: r.completed_at,
     duration_minutes: Math.round((r.duration_ms || 0) / 60000),
@@ -109,6 +113,8 @@ history.get("/export.csv", async (c) => {
     "清掃日",
     "状態",
     "種別",
+    "泊数",
+    "チェックイン",
     "開始",
     "完了",
     "実作業分",
@@ -123,6 +129,8 @@ history.get("/export.csv", async (c) => {
       r.clean_date,
       r.status === "done" ? "完了" : "キャンセル",
       r.source === "manual" ? "臨時" : "iCal",
+      r.checkin_date ? String(daysBetween(r.checkin_date, r.clean_date)) : "",
+      r.checkin_date || "",
       r.started_at || "",
       r.completed_at || "",
       String(Math.round((r.duration_ms || 0) / 60000)),

@@ -325,6 +325,17 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 }
 .cal-cell.empty { border: none; }
 .cal-cell.has { background: #fafbfc; }
+.cal-cell.stay { background: #eaf2fb; }
+.cal-cell.stay.has { background: #e2eefb; }
+.cal-in {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #2b6cb0;
+  line-height: 1;
+}
 .cal-cell.today { border-color: var(--green); }
 .cal-cell.sel { outline: 2px solid var(--green); outline-offset: -1px; background: #eef6f1; }
 .cal-num { font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -334,6 +345,11 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .dot.status-in_progress { background: var(--orange); }
 .dot.status-done { background: var(--green); }
 .cal-n { font-size: 10px; color: var(--muted); line-height: 1; }
+
+.stay-panel { border-color: #bcd4ef; background: #f2f7fd; }
+.stay-panel > strong { display: block; margin-bottom: 4px; }
+.stay-panel > div { margin: 2px 0; }
+.stay-label { margin: 12px 2px 4px; }
 
 .clist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .ccard {

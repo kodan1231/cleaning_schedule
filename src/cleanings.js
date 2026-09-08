@@ -28,12 +28,14 @@ const CARD_COLS = `
   c.id, c.clean_date, c.status, c.source, c.started_at, c.completed_at,
   p.name AS property_name,
   su.name AS started_by_name, cu.name AS completed_by_name,
+  r.checkin_date AS checkin_date, r.guest_hint AS guest_hint,
   (SELECT COUNT(*) FROM checklist_item i WHERE i.cleaning_id = c.id) AS total,
   (SELECT COUNT(*) FROM checklist_item i WHERE i.cleaning_id = c.id AND i.checked = 1) AS done
 `;
 const CARD_JOINS = `
   FROM cleaning c
   JOIN property p ON p.id = c.property_id
+  LEFT JOIN reservation r ON r.id = c.reservation_id
   LEFT JOIN user su ON su.id = c.started_by
   LEFT JOIN user cu ON cu.id = c.completed_by
 `;
@@ -77,6 +79,28 @@ export async function dashboard(c) {
   const byDate = {};
   for (const r of rows) (byDate[r.clean_date] ||= []).push(r);
 
+  // 当月に重なる予約（宿泊期間の表示用）
+  const resvClause = propId ? " AND r.property_id = ?" : "";
+  const stays = await all(
+    db,
+    `SELECT r.id, r.checkin_date, r.checkout_date, r.guest_hint, p.name AS property_name
+     FROM reservation r JOIN property p ON p.id = r.property_id
+     WHERE r.status = 'active'
+       AND r.checkin_date <= ? AND r.checkout_date >= ?${resvClause}
+     ORDER BY r.checkin_date`,
+    monthEnd,
+    monthStart,
+    ...propArg,
+  );
+  // 日付 → { occupied, checkins:[], checkouts:[] }
+  const stayByDate = {};
+  const mark = (d) => (stayByDate[d] ||= { occupied: false, checkins: [], checkouts: [] });
+  for (const s of stays) {
+    for (let d = s.checkin_date; d < s.checkout_date; d = addDays(d, 1)) mark(d).occupied = true;
+    mark(s.checkin_date).checkins.push(s);
+    mark(s.checkout_date).checkouts.push(s);
+  }
+
   // 期限切れ（未完了・過去日）— 当月以外も含めて件数だけ数える
   const overdue = await one(
     db,
@@ -99,8 +123,10 @@ export async function dashboard(c) {
     nextMonth: shiftMonth(month, 1),
     weeks: monthGrid(month),
     byDate,
+    stayByDate,
     selectedDay,
     dayCleanings: byDate[selectedDay] || [],
+    dayStay: stayByDate[selectedDay] || null,
     overdue: overdue?.n ? { count: overdue.n, first: overdue.first } : null,
     properties,
     selectedProperty: propId ? String(propId) : "",
@@ -159,7 +185,7 @@ async function loadCleaning(c, id) {
   return one(
     c.env.DB,
     `SELECT c.*, p.name AS property_name, p.checkout_time,
-            r.guest_hint AS guest_hint,
+            r.guest_hint AS guest_hint, r.checkin_date AS checkin_date, r.checkout_date AS checkout_date,
             su.name AS started_by_name, cu.name AS completed_by_name
      FROM cleaning c
      JOIN property p ON p.id = c.property_id

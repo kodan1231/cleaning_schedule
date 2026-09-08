@@ -1,6 +1,6 @@
 import { html, raw } from "../lib/html.js";
 import { authedPage } from "./layout.js";
-import { fmtDateJst } from "../lib/datetime.js";
+import { fmtDateJst, daysBetween } from "../lib/datetime.js";
 import { fmtDuration } from "../lib/events.js";
 
 export function historyPage(c, { rows, properties, filter }) {
@@ -66,9 +66,14 @@ export function historyPage(c, { rows, properties, filter }) {
                     </div>
                     <div class="ccard-row">
                       <span class="cprop">${r.property_name}</span>
-                      ${r.status === "done"
-                        ? html`<span class="cprog">${fmtDuration(r.duration_ms || 0)}</span>`
-                        : raw("")}
+                      <span>
+                        ${r.checkin_date && daysBetween(r.checkin_date, r.clean_date) > 0
+                          ? html`<span class="badge">${daysBetween(r.checkin_date, r.clean_date)}泊</span>`
+                          : raw("")}
+                        ${r.status === "done"
+                          ? html`<span class="cprog">${fmtDuration(r.duration_ms || 0)}</span>`
+                          : raw("")}
+                      </span>
                     </div>
                     <div class="ccard-row muted sm">
                       ${r.completed_by_name ? html`担当: ${r.completed_by_name}` : raw("")}

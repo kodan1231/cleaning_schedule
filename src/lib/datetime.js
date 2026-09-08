@@ -29,6 +29,13 @@ export function ymdInTz(date, tz = TZ) {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/** a→b の日数（b - a）。同日=0 */
+export function daysBetween(a, b) {
+  return Math.round(
+    (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000,
+  );
+}
+
 /** YYYY-MM-DD に日数を加算した YYYY-MM-DD を返す */
 export function addDays(ymd, days) {
   const d = new Date(`${ymd}T00:00:00Z`);

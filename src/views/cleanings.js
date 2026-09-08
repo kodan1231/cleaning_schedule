@@ -1,6 +1,6 @@
 import { html, raw } from "../lib/html.js";
 import { authedPage } from "./layout.js";
-import { fmtDateJst, fmtDateTimeJst, todayJst } from "../lib/datetime.js";
+import { fmtDateJst, fmtDateTimeJst, todayJst, daysBetween } from "../lib/datetime.js";
 import { groupByRoom, groupByFloor } from "../lib/checklist.js";
 import { workDurationMs, fmtDuration } from "../lib/events.js";
 
@@ -38,6 +38,13 @@ function progress(c) {
   return total ? html`<span class="cprog">${done}/${total}</span>` : raw("");
 }
 
+/** 予約由来なら「N泊」。取れなければ null */
+function nightsLabel(c) {
+  if (!c.checkin_date || !c.clean_date) return null;
+  const n = daysBetween(c.checkin_date, c.clean_date);
+  return n > 0 ? `${n}泊` : null;
+}
+
 function cleaningCard(c, today) {
   const overdue = c.status !== "done" && c.clean_date < today;
   const who =
@@ -50,6 +57,7 @@ function cleaningCard(c, today) {
     c.status === "done" && c.started_at && c.completed_at
       ? fmtDuration(Math.max(0, Date.parse(c.completed_at) - Date.parse(c.started_at)))
       : null;
+  const nights = nightsLabel(c);
   return html`
     <a class="ccard status-${c.status} ${overdue ? "overdue" : ""}" href="/cleanings/${c.id}">
       <div class="ccard-row">
@@ -58,7 +66,10 @@ function cleaningCard(c, today) {
       </div>
       <div class="ccard-row">
         <span class="cprop">${c.property_name}</span>
-        ${progress(c)}
+        <span>
+          ${nights ? html`<span class="badge">${nights}</span>` : raw("")}
+          ${progress(c)}
+        </span>
       </div>
       ${who || elapsed
         ? html`<div class="ccard-row muted sm">
@@ -82,8 +93,10 @@ export function dashboardPage(c, opts) {
     nextMonth,
     weeks,
     byDate,
+    stayByDate = {},
     selectedDay,
     dayCleanings,
+    dayStay,
     overdue,
     properties,
     selectedProperty,
@@ -157,15 +170,18 @@ export function dashboardPage(c, opts) {
               ${week.map((cell) => {
                 if (!cell) return html`<div class="cal-cell empty"></div>`;
                 const mk = marksFor(cell.date);
+                const st = stayByDate[cell.date];
                 const cls = [
                   "cal-cell",
                   cell.date === today ? "today" : "",
                   cell.date === selectedDay ? "sel" : "",
                   mk.count ? "has" : "",
+                  st && st.occupied ? "stay" : "",
                 ].join(" ");
                 return html`
                   <a class="${cls}" href="/?month=${month}&day=${cell.date}${pq}">
                     <span class="cal-num">${cell.day}</span>
+                    ${st && st.checkins.length ? html`<span class="cal-in">IN</span>` : raw("")}
                     ${mk.count
                       ? html`
                           <span class="cal-dots">
@@ -184,7 +200,34 @@ export function dashboardPage(c, opts) {
         )}
       </div>
 
-      <h2 class="sub">${fmtDateJst(selectedDay)} の清掃</h2>
+      <h2 class="sub">${fmtDateJst(selectedDay)}</h2>
+
+      ${dayStay && (dayStay.checkins.length || dayStay.checkouts.length || dayStay.occupied)
+        ? html`
+            <div class="card stay-panel">
+              <strong class="sm">宿泊</strong>
+              ${dayStay.checkouts.map(
+                (s) => html`<div class="sm">
+                  ${s.property_name}: <span class="badge">OUT</span>
+                  ${s.guest_hint ? html`下4桁 ${s.guest_hint}` : raw("")}
+                  （${daysBetween(s.checkin_date, s.checkout_date)}泊・${fmtDateJst(s.checkin_date)} イン）
+                </div>`,
+              )}
+              ${dayStay.checkins.map(
+                (s) => html`<div class="sm">
+                  ${s.property_name}: <span class="badge">IN</span>
+                  ${s.guest_hint ? html`下4桁 ${s.guest_hint}` : raw("")}
+                  （${daysBetween(s.checkin_date, s.checkout_date)}泊・${fmtDateJst(s.checkout_date)} アウト）
+                </div>`,
+              )}
+              ${dayStay.occupied && !dayStay.checkins.length && !dayStay.checkouts.length
+                ? html`<div class="sm muted">滞在中</div>`
+                : raw("")}
+            </div>
+          `
+        : raw("")}
+
+      <div class="stay-label muted sm">この日の清掃</div>
       ${dayCleanings.length === 0
         ? html`<div class="card muted">この日の清掃はありません。</div>`
         : html`<div class="clist">${dayCleanings.map((x) => cleaningCard(x, today))}</div>`}
@@ -239,6 +282,12 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
             ${cl.guest_hint ? html`（下4桁 ${cl.guest_hint}）` : raw("")}
           </span>
         </div>
+        ${cl.checkin_date && cl.checkout_date
+          ? html`<div class="detail-line">
+              宿泊: ${fmtDateJst(cl.checkin_date)} イン → ${fmtDateJst(cl.checkout_date)} アウト
+              <span class="badge">${daysBetween(cl.checkin_date, cl.checkout_date)}泊</span>
+            </div>`
+          : raw("")}
         ${cl.started_by_name
           ? html`<div class="detail-line muted sm">開始: ${cl.started_by_name} ${fmtDateTimeJst(cl.started_at)}</div>`
           : raw("")}
