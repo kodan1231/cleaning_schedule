@@ -8,7 +8,7 @@
 // 注意: app.js / app.css を cache-first にすると、デプロイしても古い JS/CSS が
 // 使われ続けて不整合になる（過去にトグルが毎回失敗する不具合の原因）。必ず network-first。
 
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL = `shell-${VERSION}`;
 const RUNTIME = `runtime-${VERSION}`;
 const PHOTOS = `photos-${VERSION}`;
@@ -53,7 +53,9 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(request.url);
   if (url.origin !== location.origin) return;
 
-  if (url.pathname.startsWith("/photos/")) {
+  // 画像バイナリのみ対象（?view=1 の写真詳細ページは CSRF トークンを含むため
+  // 必ず最新を取得する networkFirst に流す。request.mode !== "navigate" で判別）
+  if (url.pathname.startsWith("/photos/") && request.mode !== "navigate") {
     e.respondWith(staleWhileRevalidate(request));
     return;
   }
