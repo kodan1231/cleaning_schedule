@@ -18,6 +18,21 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// ── 並べ替えボタン（↑↓）: ページ再読み込みのたびに先頭へ戻らないよう、スクロール位置を保持 ──
+document.addEventListener("submit", (ev) => {
+  const form = ev.target;
+  const btn = ev.submitter;
+  const action = (btn && btn.getAttribute("formaction")) || form.action;
+  if (!action || !/\/move$/.test(new URL(action, location.href).pathname)) return;
+  sessionStorage.setItem("scrollY", String(window.scrollY));
+});
+(() => {
+  const y = sessionStorage.getItem("scrollY");
+  if (y == null) return;
+  sessionStorage.removeItem("scrollY");
+  requestAnimationFrame(() => window.scrollTo(0, parseInt(y, 10) || 0));
+})();
+
 // ── チェックリスト トグル ──
 document.addEventListener("submit", async (ev) => {
   const form = ev.target;
