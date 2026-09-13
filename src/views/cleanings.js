@@ -411,7 +411,7 @@ function roomPhotoStrip(list) {
       ${list.map(
         (p) => html`
           <a class="thumb" href="/room-photos/${p.id}?view=1">
-            <img src="/room-photos/${p.id}?thumb=1" alt="${p.caption || "参考写真"}" loading="lazy" />
+            <img src="/room-photos/${p.id}?thumb=1&v=${encodeURIComponent(p.uploaded_at)}" alt="${p.caption || "参考写真"}" loading="lazy" />
           </a>
         `,
       )}
@@ -485,7 +485,7 @@ function photoStrip(list, size = "") {
       ${list.map(
         (p) => html`
           <a class="thumb" href="/photos/${p.id}?view=1">
-            <img src="/photos/${p.id}?thumb=1" alt="${p.caption || "写真"}" loading="lazy" />
+            <img src="/photos/${p.id}?thumb=1&v=${encodeURIComponent(p.uploaded_at)}" alt="${p.caption || "写真"}" loading="lazy" />
           </a>
         `,
       )}

@@ -133,7 +133,7 @@ photos.get("/:id", async (c) => {
       body: html`
         <p><a href="/cleanings/${photo.cleaning_id}">&larr; 清掃へ戻る</a></p>
         <div class="photo-view">
-          <img src="/photos/${photo.id}" alt="${photo.caption || "写真"}" />
+          <img src="/photos/${photo.id}?v=${encodeURIComponent(photo.uploaded_at)}" alt="${photo.caption || "写真"}" />
         </div>
         ${photo.caption ? html`<p>${photo.caption}</p>` : raw("")}
         <p class="muted sm">${photo.uploaded_by_name || "?"}・${photo.uploaded_at}</p>
@@ -162,7 +162,7 @@ photos.get("/:id", async (c) => {
   if (Array.isArray(bytes)) bytes = new Uint8Array(bytes);
   else if (bytes instanceof ArrayBuffer) bytes = new Uint8Array(bytes);
 
-  const etag = `"${id}-${kind}"`;
+  const etag = `"${id}-${kind}-${photo.uploaded_at}"`;
   if (c.req.header("if-none-match") === etag) return c.body(null, 304);
   return c.body(bytes, 200, {
     "Content-Type": "image/jpeg",

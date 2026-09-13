@@ -219,7 +219,7 @@ cleanings.get("/:id", async (c) => {
   const photos = await loadPhotos(c.env.DB, id);
   const roomPhotos = await all(
     c.env.DB,
-    `SELECT rp.id, rp.caption, r.name AS room_name
+    `SELECT rp.id, rp.caption, rp.uploaded_at, r.name AS room_name
      FROM room_photo rp JOIN room r ON r.id = rp.room_id
      WHERE r.property_id = ? ORDER BY rp.uploaded_at, rp.id`,
     cleaning.property_id,

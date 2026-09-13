@@ -32,7 +32,7 @@ roomPhotos.get("/:id", async (c) => {
         <p><a href="javascript:history.back()">&larr; 戻る</a></p>
         <h1>${photo.room_name} の参考写真</h1>
         <div class="photo-view">
-          <img src="/room-photos/${photo.id}" alt="${photo.caption || "参考写真"}" />
+          <img src="/room-photos/${photo.id}?v=${encodeURIComponent(photo.uploaded_at)}" alt="${photo.caption || "参考写真"}" />
         </div>
         ${photo.caption ? html`<p>${photo.caption}</p>` : raw("")}
         <p class="muted sm">${photo.uploaded_by_name || "?"}・${photo.uploaded_at}</p>
@@ -62,7 +62,7 @@ roomPhotos.get("/:id", async (c) => {
   if (Array.isArray(bytes)) bytes = new Uint8Array(bytes);
   else if (bytes instanceof ArrayBuffer) bytes = new Uint8Array(bytes);
 
-  const etag = `"rp-${id}-${kind}"`;
+  const etag = `"rp-${id}-${kind}-${photo.uploaded_at}"`;
   if (c.req.header("if-none-match") === etag) return c.body(null, 304);
   return c.body(bytes, 200, {
     "Content-Type": "image/jpeg",

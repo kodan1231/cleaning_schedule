@@ -300,7 +300,7 @@ function roomPhotoThumb(c, propertyId, r, p) {
   return html`
     <div class="room-photo-thumb">
       <a class="thumb" href="/room-photos/${p.id}?view=1">
-        <img src="/room-photos/${p.id}?thumb=1" alt="${p.caption || "参考写真"}" loading="lazy" />
+        <img src="/room-photos/${p.id}?thumb=1&v=${encodeURIComponent(p.uploaded_at)}" alt="${p.caption || "参考写真"}" loading="lazy" />
       </a>
       <form method="post" action="${delBase}/delete" class="inline"
             onsubmit="return confirm('この参考写真を削除しますか？')">
