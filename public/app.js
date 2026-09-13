@@ -117,69 +117,6 @@ function cssEscape(s) {
   return String(s).replace(/["\\]/g, "\\$&");
 }
 
-// ── 間取りのドラッグ並べ替え ──
-document.documentElement.classList.remove("no-js");
-document.documentElement.classList.add("js");
-initRoomSort();
-function initRoomSort() {
-  const wrap = document.querySelector(".room-sortable");
-  const container = wrap && wrap.closest(".room-list");
-  if (!wrap || !container) return;
-  const url = container.dataset.reorderUrl;
-  const csrf = container.querySelector("[data-reorder-csrf]");
-  const hint = document.querySelector(".room-dnd-hint");
-  if (hint) hint.textContent = "グリップ（⠿）をドラッグして並べ替え";
-
-  let dragging = null;
-
-  wrap.addEventListener("pointerdown", (e) => {
-    const grip = e.target.closest(".room-grip");
-    if (!grip) return;
-    const row = grip.closest(".room-admin");
-    if (!row) return;
-    e.preventDefault();
-    dragging = row;
-    row.classList.add("dragging");
-    try {
-      wrap.setPointerCapture(e.pointerId);
-    } catch {}
-  });
-
-  wrap.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    e.preventDefault();
-    const rows = [...wrap.querySelectorAll(".room-admin:not(.dragging)")];
-    const after = rows.find((r) => {
-      const box = r.getBoundingClientRect();
-      return e.clientY < box.top + box.height / 2;
-    });
-    if (after) wrap.insertBefore(dragging, after);
-    else wrap.appendChild(dragging);
-  });
-
-  const end = async () => {
-    if (!dragging) return;
-    dragging.classList.remove("dragging");
-    dragging = null;
-    const order = [...wrap.querySelectorAll(".room-admin")]
-      .map((r) => r.dataset.roomId)
-      .join(",");
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: new URLSearchParams({ _csrf: csrf ? csrf.value : "", order }),
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-    } catch (err) {
-      console.warn("並べ替え保存失敗", err);
-      location.reload();
-    }
-  };
-  wrap.addEventListener("pointerup", end);
-  wrap.addEventListener("pointercancel", end);
-}
-
 // ── ダイアログ（JS 有効時は data-dialog リンクでモーダルを開く）──
 document.addEventListener("click", (ev) => {
   const opener = ev.target.closest("a[data-dialog]");
@@ -213,10 +150,8 @@ document.addEventListener("change", async (ev) => {
   try {
     const full = await makeJpeg(file, 1600, [0.82, 0.7, 0.6, 0.5], 1450000);
     const thumb = await makeJpeg(file, 400, [0.7], 300000);
-    const fd = new FormData();
-    fd.set("_csrf", form.querySelector('input[name=_csrf]').value);
-    const itemId = form.dataset.item;
-    if (itemId) fd.set("item_id", itemId);
+    // フォーム内の他の入力（item_id・caption 等）もそのまま引き継ぐ
+    const fd = new FormData(form);
     fd.set("full", full, "photo.jpg");
     fd.set("thumb", thumb, "thumb.jpg");
     if (label) label.textContent = "アップロード中…";

@@ -240,8 +240,13 @@ export function dashboardPage(c, opts) {
 // ─────────────────────────────────────────────
 // S-03 清掃詳細
 // ─────────────────────────────────────────────
-export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos = [], msg }) {
+export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos = [], roomPhotos = [], msg }) {
   const rooms = groupByRoom(items);
+  const roomPhotosByName = new Map();
+  for (const p of roomPhotos) {
+    if (!roomPhotosByName.has(p.room_name)) roomPhotosByName.set(p.room_name, []);
+    roomPhotosByName.get(p.room_name).push(p);
+  }
   const total = items.length;
   const doneN = items.filter((i) => i.checked).length;
   const incomplete = total - doneN;
@@ -321,7 +326,7 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
         ? html`<div class="card muted">
             この清掃にはチェック項目がありません（物件に間取り／テンプレート未設定）。
           </div>`
-        : rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem))}
+        : rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName))}
       ${total && !editable
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
         : raw("")}
@@ -373,8 +378,9 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
   });
 }
 
-function roomBlock(c, cl, r, editable, photosByItem) {
+function roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName) {
   // 初期表示は折り畳み。作業する部屋を開いてもらう。
+  const refPhotos = roomPhotosByName.get(r.name) || [];
   return html`
     <details class="card room-block" data-room-block="${r.name}">
       <summary class="room-sum">
@@ -382,10 +388,30 @@ function roomBlock(c, cl, r, editable, photosByItem) {
         <span class="muted sm ${r.total > 0 && r.done === r.total ? "room-done" : ""}"
               data-room-prog="${r.name}">${r.done}/${r.total}</span>
       </summary>
+      ${refPhotos.length
+        ? html`<div class="room-ref-photos">
+            <span class="muted sm">仕上がりイメージ</span>
+            ${roomPhotoStrip(refPhotos)}
+          </div>`
+        : raw("")}
       <ul class="items">
         ${r.items.map((it) => checkItem(c, cl, it, editable, photosByItem.get(it.id) || []))}
       </ul>
     </details>
+  `;
+}
+
+function roomPhotoStrip(list) {
+  return html`
+    <div class="photos photos-sm">
+      ${list.map(
+        (p) => html`
+          <a class="thumb" href="/room-photos/${p.id}?view=1">
+            <img src="/room-photos/${p.id}?thumb=1" alt="${p.caption || "参考写真"}" loading="lazy" />
+          </a>
+        `,
+      )}
+    </div>
   `;
 }
 

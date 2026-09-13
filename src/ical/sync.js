@@ -141,7 +141,8 @@ export async function syncProperty(env, propertyId) {
     }
   }
 
-  // 未着手・チェック未着手の清掃は、現在の間取り／テンプレでチェックリストを取り込み直す
+  // 未着手・作業中の清掃のチェックリストを、現在の間取り／テンプレに合わせて更新する
+  // （チェック済みの項目は保持される。lib/checklist.js の resnapshotPending を参照）
   const refreshed = (await resnapshotPending(db, propertyId)).length;
 
   const note =

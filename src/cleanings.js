@@ -217,7 +217,14 @@ cleanings.get("/:id", async (c) => {
     id,
   );
   const photos = await loadPhotos(c.env.DB, id);
-  return cleaningDetailPage(c, { cleaning, items, events, photos, msg: c.req.query("msg") });
+  const roomPhotos = await all(
+    c.env.DB,
+    `SELECT rp.id, rp.caption, r.name AS room_name
+     FROM room_photo rp JOIN room r ON r.id = rp.room_id
+     WHERE r.property_id = ? ORDER BY rp.uploaded_at, rp.id`,
+    cleaning.property_id,
+  );
+  return cleaningDetailPage(c, { cleaning, items, events, photos, roomPhotos, msg: c.req.query("msg") });
 });
 
 cleanings.post("/:id/photos", uploadPhoto);

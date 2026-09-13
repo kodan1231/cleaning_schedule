@@ -7,6 +7,7 @@ import { loginPage, registerPage } from "./views/auth.js";
 import { admin } from "./admin.js";
 import { dashboard, cleanings } from "./cleanings.js";
 import { photos } from "./photos.js";
+import { roomPhotos } from "./room_photos.js";
 import { history } from "./history.js";
 import { one, run, getMeta, ping } from "./db/queries.js";
 import {
@@ -196,6 +197,7 @@ app.post("/logout", async (c) => {
 app.get("/", requireAuth(), dashboard);
 app.route("/cleanings", cleanings);
 app.route("/photos", photos);
+app.route("/room-photos", roomPhotos);
 app.route("/history", history);
 
 // ─────────────────────────────────────────────

@@ -9,8 +9,8 @@ import { logEvent } from "./lib/events.js";
 import { html, raw } from "./lib/html.js";
 import { page } from "./views/layout.js";
 
-const MAX_FULL = 1_500_000; // 1.5MB（D1 の行/BLOB 上限 2,000,000 の内側）
-const MAX_THUMB = 300_000;
+export const MAX_FULL = 1_500_000; // 1.5MB（D1 の行/BLOB 上限 2,000,000 の内側）
+export const MAX_THUMB = 300_000;
 
 async function form(c) {
   const body = await c.req.parseBody();
@@ -99,7 +99,7 @@ export async function uploadPhoto(c) {
 }
 
 /** JPEG マジックナンバー（FF D8 FF） */
-function isJpeg(u8) {
+export function isJpeg(u8) {
   return u8.length > 3 && u8[0] === 0xff && u8[1] === 0xd8 && u8[2] === 0xff;
 }
 

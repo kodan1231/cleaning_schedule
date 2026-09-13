@@ -76,11 +76,30 @@ CREATE TABLE IF NOT EXISTS room_item (
   id          INTEGER PRIMARY KEY,
   room_id     INTEGER NOT NULL REFERENCES room(id) ON DELETE CASCADE,
   sort_order  INTEGER NOT NULL DEFAULT 0,
+  item_key    TEXT,                      -- 安定キー（マイグレーション 0007）。再生成時のチェック済み対応付けに使う
   label       TEXT    NOT NULL,
   needs_photo INTEGER NOT NULL DEFAULT 0,
   note        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_room_item_room ON room_item(room_id, sort_order);
+
+-- 間取りの参考写真（完成イメージ。マイグレーション 0006）
+CREATE TABLE IF NOT EXISTS room_photo (
+  id          INTEGER PRIMARY KEY,
+  room_id     INTEGER NOT NULL REFERENCES room(id) ON DELETE CASCADE,
+  caption     TEXT,
+  size_bytes  INTEGER,
+  uploaded_by INTEGER REFERENCES user(id),
+  uploaded_at TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_room_photo_room ON room_photo(room_id, uploaded_at);
+
+CREATE TABLE IF NOT EXISTS room_photo_blob (
+  room_photo_id INTEGER NOT NULL REFERENCES room_photo(id) ON DELETE CASCADE,
+  kind          TEXT    NOT NULL CHECK (kind IN ('full','thumb')),
+  bytes         BLOB    NOT NULL,
+  PRIMARY KEY (room_photo_id, kind)
+);
 
 -- ─────────────────────────────────────────────
 -- 予約（iCal 同期結果）
@@ -212,7 +231,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '5');
+  ('schema_version', '7');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)

@@ -248,56 +248,76 @@ function extraItemRow(c, propertyId, roomId, it, idx, total) {
   const base = `/admin/properties/${propertyId}/rooms/${roomId}/items/${it.id}`;
   return html`
     <li class="item">
-      <details>
-        <summary>
-          ${it.label}
-          ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
-        </summary>
-        <form method="post" action="${base}" class="form sub-form">
-          ${csrf(c)}
-          <label class="fld">
-            ラベル
-            <input type="text" name="label" value="${it.label}" maxlength="120" required />
-          </label>
-          <label class="fld chk">
-            <input type="checkbox" name="needs_photo" value="1" ${it.needs_photo ? "checked" : ""} />
-            写真の目印をつける
-          </label>
-          <label class="fld">
-            補足
-            <input type="text" name="note" value="${it.note || ""}" maxlength="200" />
-          </label>
-          <button type="submit">保存</button>
-        </form>
-        <div class="row-actions">
+      <div class="item-head">
+        <details class="item-details">
+          <summary>
+            ${it.label}
+            ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
+          </summary>
+          <form method="post" action="${base}" class="form sub-form">
+            ${csrf(c)}
+            <label class="fld">
+              ラベル
+              <input type="text" name="label" value="${it.label}" maxlength="120" required />
+            </label>
+            <label class="fld chk">
+              <input type="checkbox" name="needs_photo" value="1" ${it.needs_photo ? "checked" : ""} />
+              写真の目印をつける
+            </label>
+            <label class="fld">
+              補足
+              <input type="text" name="note" value="${it.note || ""}" maxlength="200" />
+            </label>
+            <button type="submit">保存</button>
+          </form>
+          <div class="row-actions">
+            <form method="post" action="${base}/delete" class="inline"
+                  onsubmit="return confirm('この項目を削除しますか？')">
+              ${csrf(c)}
+              <button type="submit" class="secondary danger">削除</button>
+            </form>
+          </div>
+        </details>
+        <span class="item-ops">
           <form method="post" action="${base}/move" class="inline">
             ${csrf(c)}
             <input type="hidden" name="dir" value="up" />
-            <button type="submit" class="secondary" ${idx === 0 ? "disabled" : ""}>↑</button>
+            <button type="submit" class="linkbtn" ${idx === 0 ? "disabled" : ""}>↑</button>
           </form>
           <form method="post" action="${base}/move" class="inline">
             ${csrf(c)}
             <input type="hidden" name="dir" value="down" />
-            <button type="submit" class="secondary" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+            <button type="submit" class="linkbtn" ${idx === total - 1 ? "disabled" : ""}>↓</button>
           </form>
-          <form method="post" action="${base}/delete" class="inline"
-                onsubmit="return confirm('この項目を削除しますか？')">
-            ${csrf(c)}
-            <button type="submit" class="secondary danger">削除</button>
-          </form>
-        </div>
-      </details>
+        </span>
+      </div>
     </li>
+  `;
+}
+
+function roomPhotoThumb(c, propertyId, r, p) {
+  const delBase = `/admin/properties/${propertyId}/rooms/${r.id}/photos/${p.id}`;
+  return html`
+    <div class="room-photo-thumb">
+      <a class="thumb" href="/room-photos/${p.id}?view=1">
+        <img src="/room-photos/${p.id}?thumb=1" alt="${p.caption || "参考写真"}" loading="lazy" />
+      </a>
+      <form method="post" action="${delBase}/delete" class="inline"
+            onsubmit="return confirm('この参考写真を削除しますか？')">
+        ${csrf(c)}
+        <button type="submit" class="linkbtn danger sm">削除</button>
+      </form>
+    </div>
   `;
 }
 
 function roomRow(c, propertyId, r, templates, idx, total) {
   const extra = r.extra || [];
+  const photos = r.photos || [];
   return html`
     <div class="room-admin" data-room-id="${r.id}">
       <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}" class="room-line">
         ${csrf(c)}
-        <span class="room-grip" aria-hidden="true" title="ドラッグで並べ替え">⠿</span>
         <input class="room-name" type="text" name="name" value="${r.name}" maxlength="40" required />
         <select name="template_id" class="room-tpl">
           <option value="">テンプレ未割当</option>
@@ -312,9 +332,9 @@ function roomRow(c, propertyId, r, templates, idx, total) {
         <button type="submit" class="secondary sm" title="保存">保存</button>
         <span class="room-ops">
           <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
-            name="dir" value="up" class="linkbtn room-move" ${idx === 0 ? "disabled" : ""}>↑</button>
+            name="dir" value="up" class="linkbtn" ${idx === 0 ? "disabled" : ""}>↑</button>
           <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/move"
-            name="dir" value="down" class="linkbtn room-move" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+            name="dir" value="down" class="linkbtn" ${idx === total - 1 ? "disabled" : ""}>↓</button>
           <button type="submit" formaction="/admin/properties/${propertyId}/rooms/${r.id}/delete"
             class="linkbtn danger" onclick="return confirm('この間取りを削除しますか？')">✕</button>
         </span>
@@ -345,6 +365,29 @@ function roomRow(c, propertyId, r, templates, idx, total) {
           </form>
         </div>
       </details>
+      <details class="room-extra">
+        <summary>参考写真（完成イメージ） <span class="muted sm">(${photos.length})</span></summary>
+        <div class="room-extra-body">
+          ${photos.length
+            ? html`<div class="room-photos">
+                ${photos.map((p) => roomPhotoThumb(c, propertyId, r, p))}
+              </div>`
+            : html`<p class="muted sm">清掃後にどう仕上がっていればいいかの写真を登録できます。清掃担当者のチェックリスト画面にも表示されます。</p>`}
+          <form method="post" action="/admin/properties/${propertyId}/rooms/${r.id}/photos" class="form sub-form photo-form"
+                enctype="multipart/form-data">
+            ${csrf(c)}
+            <label class="fld">
+              キャプション（任意・先に入力してください）
+              <input type="text" name="caption" maxlength="200" />
+            </label>
+            <label class="fld">
+              画像
+              <input type="file" name="full" accept="image/*" required />
+            </label>
+            <noscript><button type="submit" class="secondary">写真を追加</button></noscript>
+          </form>
+        </div>
+      </details>
     </div>
   `;
 }
@@ -371,13 +414,10 @@ export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
         ${roomsMissingTpl ? html`<br /><strong style="color:var(--orange)">項目が未設定の間取りが ${roomsMissingTpl} 室あります（テンプレも追加項目もなし）。</strong>` : raw("")}
       </p>
 
-      <div class="card room-list" data-reorder-url="/admin/properties/${p.id}/rooms/reorder">
-        <div class="room-sortable">
-          ${rooms.length === 0
-            ? html`<p class="muted sm">まだ間取りがありません。</p>`
-            : rooms.map((r, i) => roomRow(c, p.id, r, templates, i, rooms.length))}
-        </div>
-        <input type="hidden" name="_csrf" value="${c.get("csrf")}" data-reorder-csrf />
+      <div class="card room-list">
+        ${rooms.length === 0
+          ? html`<p class="muted sm">まだ間取りがありません。</p>`
+          : rooms.map((r, i) => roomRow(c, p.id, r, templates, i, rooms.length))}
         <form method="post" action="/admin/properties/${p.id}/rooms" class="room-line room-add">
           ${csrf(c)}
           <input class="room-name" type="text" name="name" maxlength="40" placeholder="間取り名（例: キッチン）" required />
@@ -391,20 +431,20 @@ export function propertyForm(c, { p, rooms = [], templates = [], msg, err }) {
         </form>
       </div>
       ${rooms.length > 1
-        ? html`<p class="muted sm">間取りは <span class="room-dnd-hint">↑↓ で並べ替え</span> できます。</p>`
+        ? html`<p class="muted sm">間取りは ↑↓ ボタンで並べ替えできます。</p>`
         : raw("")}
       <p class="muted sm">
         テンプレートは <a href="/admin/templates">テンプレート管理</a> で作成・編集します。
       </p>
 
       <form method="post" action="/admin/properties/${p.id}/resnapshot" class="card form"
-            onsubmit="return confirm('未完了の清掃のチェックリストを現在のテンプレートで作り直します。チェック状態はリセットされます。よろしいですか？')">
+            onsubmit="return confirm('未完了・作業中の清掃のチェックリストを現在の間取り／テンプレに合わせて更新します。チェック済みの項目は保持されます。よろしいですか？')">
         ${csrf(c)}
         <p class="muted sm">
-          間取り／テンプレを変更したあと、既存の未完了清掃にも反映したいときに押します
-          （同期時にも自動で反映されます）。
+          間取り／テンプレを変更したあと、既存の清掃にも反映したいときに押します
+          （同期時にも自動で反映されます。チェック済みの項目は失われません）。
         </p>
-        <button type="submit" class="secondary">チェックリストを再生成</button>
+        <button type="submit" class="secondary">チェックリストを最新の構成に更新</button>
       </form>
 
       <form method="post" action="/admin/properties/${p.id}/toggle" class="card form">
@@ -532,47 +572,52 @@ export function templateEditor(c, { t, items = [], roomCount = 0, msg, err }) {
 }
 
 function templateItemRow(c, tplId, it, idx, total) {
+  const base = `/admin/templates/${tplId}/items/${it.id}`;
   return html`
     <li class="item">
-      <details>
-        <summary>
-          ${it.label}
-          ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
-        </summary>
-        <form method="post" action="/admin/templates/${tplId}/items/${it.id}" class="form sub-form">
-          ${csrf(c)}
-          <label class="fld">
-            ラベル
-            <input type="text" name="label" value="${it.label}" maxlength="120" required />
-          </label>
-          <label class="fld chk">
-            <input type="checkbox" name="needs_photo" value="1" ${it.needs_photo ? "checked" : ""} />
-            写真の目印をつける
-          </label>
-          <label class="fld">
-            補足
-            <input type="text" name="note" value="${it.note || ""}" maxlength="200" />
-          </label>
-          <button type="submit">保存</button>
-        </form>
-        <div class="row-actions">
-          <form method="post" action="/admin/templates/${tplId}/items/${it.id}/move" class="inline">
+      <div class="item-head">
+        <details class="item-details">
+          <summary>
+            ${it.label}
+            ${it.needs_photo ? html`<span class="badge photo">写真</span>` : raw("")}
+          </summary>
+          <form method="post" action="${base}" class="form sub-form">
+            ${csrf(c)}
+            <label class="fld">
+              ラベル
+              <input type="text" name="label" value="${it.label}" maxlength="120" required />
+            </label>
+            <label class="fld chk">
+              <input type="checkbox" name="needs_photo" value="1" ${it.needs_photo ? "checked" : ""} />
+              写真の目印をつける
+            </label>
+            <label class="fld">
+              補足
+              <input type="text" name="note" value="${it.note || ""}" maxlength="200" />
+            </label>
+            <button type="submit">保存</button>
+          </form>
+          <div class="row-actions">
+            <form method="post" action="${base}/delete" class="inline"
+                  onsubmit="return confirm('この項目を削除しますか？')">
+              ${csrf(c)}
+              <button type="submit" class="secondary danger">削除</button>
+            </form>
+          </div>
+        </details>
+        <span class="item-ops">
+          <form method="post" action="${base}/move" class="inline">
             ${csrf(c)}
             <input type="hidden" name="dir" value="up" />
-            <button type="submit" class="secondary" ${idx === 0 ? "disabled" : ""}>↑</button>
+            <button type="submit" class="linkbtn" ${idx === 0 ? "disabled" : ""}>↑</button>
           </form>
-          <form method="post" action="/admin/templates/${tplId}/items/${it.id}/move" class="inline">
+          <form method="post" action="${base}/move" class="inline">
             ${csrf(c)}
             <input type="hidden" name="dir" value="down" />
-            <button type="submit" class="secondary" ${idx === total - 1 ? "disabled" : ""}>↓</button>
+            <button type="submit" class="linkbtn" ${idx === total - 1 ? "disabled" : ""}>↓</button>
           </form>
-          <form method="post" action="/admin/templates/${tplId}/items/${it.id}/delete" class="inline"
-                onsubmit="return confirm('この項目を削除しますか？')">
-            ${csrf(c)}
-            <button type="submit" class="secondary danger">削除</button>
-          </form>
-        </div>
-      </details>
+        </span>
+      </div>
     </li>
   `;
 }

@@ -8,6 +8,7 @@ import { itemKey, randomPin } from "./lib/ids.js";
 import { nowIso } from "./lib/datetime.js";
 import { resnapshotPending } from "./lib/checklist.js";
 import { syncProperty, runScheduledSync } from "./ical/sync.js";
+import { isJpeg, MAX_FULL, MAX_THUMB } from "./photos.js";
 import {
   adminHome,
   propertyList,
@@ -62,8 +63,9 @@ admin.get("/", async (c) => {
   );
   const storage = await one(
     db,
-    `SELECT (SELECT COUNT(*) FROM photo) AS photos,
-            (SELECT COALESCE(SUM(LENGTH(bytes)), 0) FROM photo_blob) AS bytes`,
+    `SELECT (SELECT COUNT(*) FROM photo) + (SELECT COUNT(*) FROM room_photo) AS photos,
+            (SELECT COALESCE(SUM(LENGTH(bytes)), 0) FROM photo_blob)
+              + (SELECT COALESCE(SUM(LENGTH(bytes)), 0) FROM room_photo_blob) AS bytes`,
   );
   return adminHome(c, { counts, properties, syncLogs, storage, msg: c.req.query("msg") });
 });
@@ -145,6 +147,7 @@ async function propertyDetailData(c, id, extra = {}) {
   );
   const roomIds = rooms.map((r) => r.id);
   const extraByRoom = new Map();
+  const photosByRoom = new Map();
   if (roomIds.length) {
     const items = await all(
       c.env.DB,
@@ -156,8 +159,21 @@ async function propertyDetailData(c, id, extra = {}) {
       if (!extraByRoom.has(it.room_id)) extraByRoom.set(it.room_id, []);
       extraByRoom.get(it.room_id).push(it);
     }
+    const photos = await all(
+      c.env.DB,
+      `SELECT id, room_id, caption, uploaded_at FROM room_photo
+       WHERE room_id IN (${roomIds.map(() => "?").join(",")}) ORDER BY uploaded_at, id`,
+      ...roomIds,
+    );
+    for (const p of photos) {
+      if (!photosByRoom.has(p.room_id)) photosByRoom.set(p.room_id, []);
+      photosByRoom.get(p.room_id).push(p);
+    }
   }
-  for (const r of rooms) r.extra = extraByRoom.get(r.id) || [];
+  for (const r of rooms) {
+    r.extra = extraByRoom.get(r.id) || [];
+    r.photos = photosByRoom.get(r.id) || [];
+  }
   const templates = await loadTemplates(c.env.DB);
   return { p, rooms, templates, msg: c.req.query("msg"), ...extra };
 }
@@ -219,9 +235,12 @@ admin.post("/properties/:id/resnapshot", async (c) => {
   if (!body) return badReq(c);
   const p = await one(c.env.DB, "SELECT id FROM property WHERE id = ?", id);
   if (!p) return c.notFound();
-  const done = await resnapshotPending(c.env.DB, id, { force: true, includeInProgress: true });
+  const done = await resnapshotPending(c.env.DB, id);
   return c.redirect(
-    to(`/admin/properties/${id}`, `${done.length} 件の清掃のチェックリストを再生成しました`),
+    to(
+      `/admin/properties/${id}`,
+      `${done.length} 件の清掃のチェックリストを最新の構成に更新しました（チェック済みの項目は保持されます）`,
+    ),
   );
 });
 
@@ -250,27 +269,6 @@ admin.post("/properties/:id/rooms", async (c) => {
     nowIso(),
   );
   return c.redirect(to(`/admin/properties/${id}`, "間取りを追加しました"));
-});
-
-// ドラッグ&ドロップ並べ替え（JS。body.order = "id,id,id"）。:rid ルートより前に登録
-admin.post("/properties/:id/rooms/reorder", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-  const body = await form(c);
-  if (!body) return badReq(c);
-  const wantsJson = (c.req.header("accept") || "").includes("application/json");
-  const ids = String(body.order || "")
-    .split(",")
-    .map((s) => parseInt(s, 10))
-    .filter((n) => Number.isInteger(n));
-  const rooms = await all(c.env.DB, "SELECT id FROM room WHERE property_id = ?", id);
-  const valid = new Set(rooms.map((r) => r.id));
-  if (ids.length !== rooms.length || !ids.every((n) => valid.has(n))) {
-    return wantsJson ? c.json({ ok: false }, 400) : c.redirect(`/admin/properties/${id}`);
-  }
-  for (let i = 0; i < ids.length; i++) {
-    await run(c.env.DB, "UPDATE room SET sort_order = ? WHERE id = ?", i + 1, ids[i]);
-  }
-  return wantsJson ? c.json({ ok: true }) : c.redirect(`/admin/properties/${id}`);
 });
 
 admin.post("/properties/:id/rooms/:rid", async (c) => {
@@ -345,9 +343,10 @@ admin.post("/properties/:id/rooms/:rid/items", async (c) => {
     ))?.n || 1;
   await run(
     c.env.DB,
-    "INSERT INTO room_item (room_id, sort_order, label, needs_photo, note) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO room_item (room_id, sort_order, item_key, label, needs_photo, note) VALUES (?, ?, ?, ?, ?, ?)",
     rid,
     next,
+    itemKey(),
     data.label,
     data.needs_photo,
     data.note,
@@ -420,6 +419,73 @@ admin.post("/properties/:id/rooms/:rid/items/:itid/move", async (c) => {
     await run(c.env.DB, "UPDATE room_item SET sort_order = ? WHERE id = ?", siblings[idx].sort_order, siblings[j].id);
   }
   return c.redirect(`/admin/properties/${id}`);
+});
+
+// ── 間取りの参考写真（room_photo）──
+admin.post("/properties/:id/rooms/:rid/photos", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const wantsJson = (c.req.header("accept") || "").includes("application/json");
+  const body = await form(c);
+  const bad = async (msg, code = 400) =>
+    wantsJson
+      ? c.json({ ok: false, error: msg }, code)
+      : propertyForm(c, await propertyDetailData(c, id, { err: msg }));
+  if (!body) return badReq(c);
+  if (!(await ownedRoom(c, id, rid))) return c.notFound();
+
+  const full = body.full;
+  if (!full || typeof full === "string" || typeof full.arrayBuffer !== "function") {
+    return bad("画像ファイルを選択してください");
+  }
+  const fullBuf = new Uint8Array(await full.arrayBuffer());
+  if (!isJpeg(fullBuf)) return bad("JPEG 画像のみアップロードできます（対応ブラウザで撮影してください）", 415);
+  if (fullBuf.byteLength > MAX_FULL) return bad("画像が大きすぎます。撮り直してください", 413);
+
+  let thumbBuf = fullBuf;
+  const thumb = body.thumb;
+  if (thumb && typeof thumb !== "string" && typeof thumb.arrayBuffer === "function") {
+    const tb = new Uint8Array(await thumb.arrayBuffer());
+    if (isJpeg(tb) && tb.byteLength <= MAX_THUMB) thumbBuf = tb;
+  }
+
+  const caption = String(body.caption || "").trim().slice(0, 200) || null;
+  const meta = await run(
+    c.env.DB,
+    "INSERT INTO room_photo (room_id, caption, size_bytes, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?)",
+    rid,
+    caption,
+    fullBuf.byteLength,
+    c.get("user").id,
+    nowIso(),
+  );
+  const photoId = meta.last_row_id;
+  await run(c.env.DB, "INSERT INTO room_photo_blob (room_photo_id, kind, bytes) VALUES (?, 'full', ?)", photoId, fullBuf);
+  await run(c.env.DB, "INSERT INTO room_photo_blob (room_photo_id, kind, bytes) VALUES (?, 'thumb', ?)", photoId, thumbBuf);
+
+  return wantsJson
+    ? c.json({ ok: true, photoId })
+    : c.redirect(to(`/admin/properties/${id}`, "参考写真を追加しました"));
+});
+
+admin.post("/properties/:id/rooms/:rid/photos/:pid/delete", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const pid = parseInt(c.req.param("pid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const photo = await one(
+    c.env.DB,
+    `SELECT rp.id FROM room_photo rp JOIN room r ON r.id = rp.room_id
+     WHERE rp.id = ? AND rp.room_id = ? AND r.property_id = ?`,
+    pid,
+    rid,
+    id,
+  );
+  if (!photo) return c.notFound();
+  await run(c.env.DB, "DELETE FROM room_photo_blob WHERE room_photo_id = ?", pid);
+  await run(c.env.DB, "DELETE FROM room_photo WHERE id = ?", pid);
+  return c.redirect(to(`/admin/properties/${id}`, "参考写真を削除しました"));
 });
 
 admin.post("/properties/:id/toggle", async (c) => {

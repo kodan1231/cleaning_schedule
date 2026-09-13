@@ -173,6 +173,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .item:first-child { border-top: none; }
 .item summary { cursor: pointer; font-size: 14px; }
 .sub-form { margin: 10px 0; }
+.item-head { display: flex; align-items: flex-start; gap: 6px; }
+.item-details { flex: 1; min-width: 0; }
+.item-ops { display: flex; flex: none; gap: 2px; padding-top: 2px; }
+.item-ops .linkbtn { padding: 4px 8px; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
 .row-actions button { padding: 6px 10px; min-height: 36px; }
 button.sm, .btn.sm { padding: 6px 10px; min-height: 36px; font-size: 13px; }
@@ -210,13 +214,13 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .dialog-actions button { align-self: auto; }
 
-/* 間取り（コンパクト行・1行に収める） */
+/* 間取り（コンパクト行。↑↓ボタンは常時表示） */
 .room-list { display: flex; flex-direction: column; gap: 6px; }
 .room-admin { border-top: 1px solid var(--line); }
-.room-sortable > .room-admin:first-child { border-top: none; }
+.room-admin:first-child { border-top: none; }
 .room-line {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   margin: 0;
@@ -228,23 +232,6 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .room-line button.sm, .room-line button.secondary { flex: none; padding: 6px 8px; font-size: 12px; min-height: 34px; }
 .room-ops { display: inline-flex; flex: none; gap: 0; margin-left: 0; }
 .room-ops .linkbtn { padding: 2px 6px; }
-
-/* JS 無効時のみ ↑↓ が出るので、その時だけ折り返しを許可 */
-.no-js .room-line { flex-wrap: wrap; }
-
-.room-grip {
-  flex: none;
-  cursor: grab;
-  color: var(--gray);
-  font-size: 16px;
-  line-height: 1;
-  padding: 4px 0;
-  touch-action: none;
-  user-select: none;
-}
-.no-js .room-grip { display: none; }
-.js .room-move { display: none; }
-.room-admin.dragging { opacity: 0.6; background: #eef6f1; border-radius: 8px; }
 
 /* 間取りごとの追加項目 */
 .room-extra { margin: 0 0 4px 22px; }
@@ -261,6 +248,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .room-extra-body { padding: 4px 0 8px; }
 .room-extra-body .items { margin-bottom: 8px; }
 .room-extra-body .sub-form { margin: 0; }
+.room-photos { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.room-photo-thumb { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.room-photo-thumb .thumb { width: 84px; height: 84px; }
 .linkbtn {
   background: none;
   border: 1px solid var(--line);
@@ -477,6 +467,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .room-name { font-weight: 700; }
 .room-done { color: var(--green); font-weight: 700; }
 .room-done::after { content: " ✓"; }
+.room-ref-photos { padding: 0 14px 10px; }
+.room-ref-photos > .muted { display: block; margin-bottom: 6px; }
 
 /* チェック項目（コンパクト） */
 .items { list-style: none; margin: 0; padding: 0; }
