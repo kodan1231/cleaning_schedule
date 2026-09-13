@@ -273,7 +273,8 @@ export function cleaningDetailPage(
   if (eventsQuery.user) filteredEvents = filteredEvents.filter((e) => String(e.user_id) === eventsQuery.user);
   if (eventsQuery.kind) filteredEvents = filteredEvents.filter((e) => e.kind === eventsQuery.kind);
   const RECENT_EVENTS = 10;
-  const displayEvents = showAllEvents ? filteredEvents : events.slice(-RECENT_EVENTS);
+  // events は実作業時間の計算（workDurationMs）のため古い順のまま保持し、表示用だけ新しい順に反転する
+  const displayEvents = (showAllEvents ? filteredEvents : events.slice(-RECENT_EVENTS)).slice().reverse();
 
   return authedPage(c, {
     title: cl.property_name,
