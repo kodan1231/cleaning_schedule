@@ -14,24 +14,42 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (refreshing) return;
     refreshing = true;
+    saveUiState();
     location.reload();
   });
 }
 
-// ── 並べ替えボタン（↑↓）: ページ再読み込みのたびに先頭へ戻らないよう、スクロール位置を保持 ──
+// ── ページ再読み込みをまたいで UI 状態を保持（スクロール位置・開いている間取りアコーディオン） ──
+// 並べ替えボタンや写真アップロードは reload を伴うため、そのたびに先頭へ戻ったり
+// 開いていた間取りが閉じたりしないようにする。
+function saveUiState() {
+  const openRooms = [...document.querySelectorAll(".room-block[open]")].map((d) => d.dataset.roomBlock);
+  sessionStorage.setItem("uiState", JSON.stringify({ scrollY: window.scrollY, openRooms }));
+}
+(() => {
+  const raw = sessionStorage.getItem("uiState");
+  if (raw == null) return;
+  sessionStorage.removeItem("uiState");
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  for (const name of state.openRooms || []) {
+    const el = document.querySelector(`.room-block[data-room-block="${cssEscape(name)}"]`);
+    if (el) el.open = true;
+  }
+  requestAnimationFrame(() => window.scrollTo(0, state.scrollY || 0));
+})();
+
 document.addEventListener("submit", (ev) => {
   const form = ev.target;
   const btn = ev.submitter;
   const action = (btn && btn.getAttribute("formaction")) || form.action;
   if (!action || !/\/move$/.test(new URL(action, location.href).pathname)) return;
-  sessionStorage.setItem("scrollY", String(window.scrollY));
+  saveUiState();
 });
-(() => {
-  const y = sessionStorage.getItem("scrollY");
-  if (y == null) return;
-  sessionStorage.removeItem("scrollY");
-  requestAnimationFrame(() => window.scrollTo(0, parseInt(y, 10) || 0));
-})();
 
 // ── チェックリスト トグル ──
 document.addEventListener("submit", async (ev) => {
@@ -177,6 +195,7 @@ document.addEventListener("change", async (ev) => {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
+    saveUiState();
     location.reload();
   } catch (e) {
     console.warn("写真アップロード失敗", e);
