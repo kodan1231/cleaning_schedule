@@ -257,15 +257,12 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
   const running = cl.status === "in_progress";
 
   const photosByItem = new Map();
-  const cleaningPhotos = [];
   for (const p of photos) {
-    if (p.checklist_item_id) {
-      if (!photosByItem.has(p.checklist_item_id)) photosByItem.set(p.checklist_item_id, []);
-      photosByItem.get(p.checklist_item_id).push(p);
-    } else {
-      cleaningPhotos.push(p);
-    }
+    if (!p.checklist_item_id) continue;
+    if (!photosByItem.has(p.checklist_item_id)) photosByItem.set(p.checklist_item_id, []);
+    photosByItem.get(p.checklist_item_id).push(p);
   }
+  const photoGroups = groupPhotosByRoom(photos, items);
 
   return authedPage(c, {
     title: cl.property_name,
@@ -333,9 +330,16 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
 
       <h2 class="sub">写真 <span class="muted sm">${photos.length}枚</span></h2>
       <div class="card">
-        ${cleaningPhotos.length
-          ? photoStrip(cleaningPhotos)
-          : html`<p class="muted sm">清掃全体の写真はまだありません。</p>`}
+        ${photoGroups.length
+          ? photoGroups.map(
+              (g) => html`
+                <div class="photo-group">
+                  <div class="muted sm">${g.name}</div>
+                  ${photoStrip(g.photos)}
+                </div>
+              `,
+            )
+          : html`<p class="muted sm">写真はまだありません。</p>`}
         ${editable ? uploadWidget(c, cl.id, null) : raw("")}
       </div>
 
@@ -456,6 +460,23 @@ function cameraBtn(c, cleaningId, itemId, want) {
       </label>
     </form>
   `;
+}
+
+const UNGROUPED_ROOM = "未分類（間取り不明）";
+
+/** photo を、紐づくチェック項目の間取り単位でまとめる。[{ name, sort, photos }]（room_sort 順、未分類は末尾） */
+function groupPhotosByRoom(photos, items) {
+  const roomByItemId = new Map(items.map((it) => [it.id, { name: it.room_name, sort: it.room_sort }]));
+  const map = new Map();
+  for (const p of photos) {
+    const room = p.checklist_item_id ? roomByItemId.get(p.checklist_item_id) : null;
+    const name = room ? room.name : UNGROUPED_ROOM;
+    if (!map.has(name)) map.set(name, { sort: room ? room.sort : Infinity, photos: [] });
+    map.get(name).photos.push(p);
+  }
+  return [...map.entries()]
+    .map(([name, v]) => ({ name, sort: v.sort, photos: v.photos }))
+    .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
 }
 
 function photoStrip(list, size = "") {

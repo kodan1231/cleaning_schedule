@@ -470,6 +470,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .room-ref-photos { padding: 0 14px 10px; }
 .room-ref-photos > .muted { display: block; margin-bottom: 6px; }
 
+.photo-group + .photo-group { margin-top: 10px; }
+.photo-group > .muted { display: block; margin-bottom: 6px; }
+
 /* チェック項目（コンパクト） */
 .items { list-style: none; margin: 0; padding: 0; }
 .chk-item { border-top: 1px solid var(--line); }
