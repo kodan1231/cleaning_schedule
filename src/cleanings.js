@@ -211,7 +211,7 @@ cleanings.get("/:id", async (c) => {
   );
   const events = await all(
     c.env.DB,
-    `SELECT e.kind, e.at, e.detail, u.name AS user_name
+    `SELECT e.kind, e.at, e.detail, e.user_id, u.name AS user_name
      FROM cleaning_event e LEFT JOIN user u ON u.id = e.user_id
      WHERE e.cleaning_id = ? ORDER BY e.at ASC, e.id ASC`,
     id,
@@ -224,7 +224,20 @@ cleanings.get("/:id", async (c) => {
      WHERE r.property_id = ? ORDER BY rp.uploaded_at, rp.id`,
     cleaning.property_id,
   );
-  return cleaningDetailPage(c, { cleaning, items, events, photos, roomPhotos, msg: c.req.query("msg") });
+  const eventsQuery = {
+    all: c.req.query("events") === "all",
+    user: c.req.query("euser") || "",
+    kind: c.req.query("ekind") || "",
+  };
+  return cleaningDetailPage(c, {
+    cleaning,
+    items,
+    events,
+    photos,
+    roomPhotos,
+    eventsQuery,
+    msg: c.req.query("msg"),
+  });
 });
 
 cleanings.post("/:id/photos", uploadPhoto);

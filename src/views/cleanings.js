@@ -240,7 +240,10 @@ export function dashboardPage(c, opts) {
 // ─────────────────────────────────────────────
 // S-03 清掃詳細
 // ─────────────────────────────────────────────
-export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos = [], roomPhotos = [], msg }) {
+export function cleaningDetailPage(
+  c,
+  { cleaning: cl, items, events = [], photos = [], roomPhotos = [], eventsQuery = {}, msg },
+) {
   const rooms = groupByRoom(items);
   const roomPhotosByName = new Map();
   for (const p of roomPhotos) {
@@ -263,6 +266,14 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
     photosByItem.get(p.checklist_item_id).push(p);
   }
   const photoGroups = groupPhotosByRoom(photos, items);
+
+  const showAllEvents = Boolean(eventsQuery.all || eventsQuery.user || eventsQuery.kind);
+  const eventUsers = [...new Map(events.filter((e) => e.user_id).map((e) => [e.user_id, e.user_name])).entries()];
+  let filteredEvents = events;
+  if (eventsQuery.user) filteredEvents = filteredEvents.filter((e) => String(e.user_id) === eventsQuery.user);
+  if (eventsQuery.kind) filteredEvents = filteredEvents.filter((e) => e.kind === eventsQuery.kind);
+  const RECENT_EVENTS = 10;
+  const displayEvents = showAllEvents ? filteredEvents : events.slice(-RECENT_EVENTS);
 
   return authedPage(c, {
     title: cl.property_name,
@@ -346,19 +357,64 @@ export function cleaningDetailPage(c, { cleaning: cl, items, events = [], photos
       ${events.length
         ? html`
             <h2 class="sub">作業記録</h2>
+            ${showAllEvents
+              ? html`
+                  <form method="get" action="/cleanings/${cl.id}" class="card form filter-form">
+                    <input type="hidden" name="events" value="all" />
+                    <div class="filter-grid">
+                      <label class="fld">
+                        担当者
+                        <select name="euser">
+                          <option value="">すべて</option>
+                          ${eventUsers.map(
+                            ([uid, uname]) => html`
+                              <option value="${uid}" ${String(eventsQuery.user) === String(uid) ? "selected" : ""}>
+                                ${uname}
+                              </option>
+                            `,
+                          )}
+                        </select>
+                      </label>
+                      <label class="fld">
+                        操作
+                        <select name="ekind">
+                          <option value="">すべて</option>
+                          ${Object.entries(EVENT_LABEL).map(
+                            ([kind, label]) => html`
+                              <option value="${kind}" ${eventsQuery.kind === kind ? "selected" : ""}>${label}</option>
+                            `,
+                          )}
+                        </select>
+                      </label>
+                    </div>
+                    <button type="submit">絞り込む</button>
+                  </form>
+                `
+              : raw("")}
             <div class="card">
-              <ul class="timeline">
-                ${events.map(
-                  (e) => html`
-                    <li>
-                      <span class="tl-at">${fmtDateTimeJst(e.at)}</span>
-                      <span class="tl-kind">${EVENT_LABEL[e.kind] || e.kind}</span>
-                      ${e.detail ? html`<span class="tl-detail">${e.detail}</span>` : raw("")}
-                      ${e.user_name ? html`<span class="tl-who muted sm">${e.user_name}</span>` : raw("")}
-                    </li>
-                  `,
-                )}
-              </ul>
+              ${displayEvents.length
+                ? html`
+                    <ul class="timeline">
+                      ${displayEvents.map(
+                        (e) => html`
+                          <li>
+                            <span class="tl-at">${fmtDateTimeJst(e.at)}</span>
+                            <span class="tl-kind">${EVENT_LABEL[e.kind] || e.kind}</span>
+                            ${e.detail ? html`<span class="tl-detail">${e.detail}</span>` : raw("")}
+                            ${e.user_name ? html`<span class="tl-who muted sm">${e.user_name}</span>` : raw("")}
+                          </li>
+                        `,
+                      )}
+                    </ul>
+                  `
+                : html`<p class="muted sm">条件に一致する記録がありません。</p>`}
+              ${showAllEvents
+                ? html`<p class="muted sm"><a href="/cleanings/${cl.id}">直近${RECENT_EVENTS}件の表示に戻す</a></p>`
+                : events.length > RECENT_EVENTS
+                  ? html`<p class="muted sm">
+                      <a href="/cleanings/${cl.id}?events=all">すべて表示（全${events.length}件）</a>
+                    </p>`
+                  : raw("")}
             </div>
           `
         : raw("")}
