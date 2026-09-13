@@ -72,11 +72,14 @@ async function insertItem(db, cleaningId, room, sortOrder, key, it) {
 
 /**
  * 未着手/作業中の清掃のチェックリストを、現在の間取り・テンプレで作り直す（マージ方式）。
- *   - チェック済みの項目は、同じ間取り＋安定キー(item_key)で現行の項目と対応付けられればそのまま保持
- *     （ラベル等は更新せず、元のスナップショットのまま固定）。
- *   - 対応する項目がテンプレ/room_item から削除されていた場合も、その間取りの個別項目として残す
- *     （チェック済みの作業内容を失わないため）。
- *   - 未チェックの項目は対応付けをせず、現在の構成で作り直す。
+ *   - 現行のテンプレ/room_item と同じ間取り＋安定キー(item_key)で対応付けられる項目は、
+ *     既存の checklist_item 行を UPDATE で更新する（行を削除して作り直さない）。
+ *     これは写真（photo.checklist_item_id）が項目の削除で自動的に外れてしまう
+ *     （FK の ON DELETE SET NULL）のを防ぐための必須条件。
+ *     - チェック済みならラベル等は更新せず元のまま固定、位置だけ更新。
+ *     - 未チェックなら最新のラベル等に更新。
+ *   - 対応付けられなかった既存項目は、チェック済み・または写真が添付されている場合に限り
+ *     個別項目として残す（削除しない）。それ以外（未チェック・写真なし）は安全に削除する。
  * 完了・キャンセル済みの清掃は対象外。
  * @returns 作り直した清掃 id の配列
  */
@@ -94,10 +97,16 @@ export async function resnapshotPending(db, propertyId) {
 
 async function mergeSnapshot(db, cleaningId, propertyId) {
   const existing = await all(db, "SELECT * FROM checklist_item WHERE cleaning_id = ?", cleaningId);
-  const checkedPool = existing.filter((i) => i.checked);
+  const photoItemIds = new Set(
+    (
+      await all(
+        db,
+        "SELECT DISTINCT checklist_item_id FROM photo WHERE cleaning_id = ? AND checklist_item_id IS NOT NULL",
+        cleaningId,
+      )
+    ).map((r) => r.checklist_item_id),
+  );
   const usedIds = new Set();
-
-  await run(db, "DELETE FROM checklist_item WHERE cleaning_id = ?", cleaningId);
 
   const rooms = await all(
     db,
@@ -109,27 +118,52 @@ async function mergeSnapshot(db, cleaningId, propertyId) {
   for (const room of rooms) {
     let order = 0;
     for (const it of await freshItemsForRoom(db, room)) {
-      const match = checkedPool.find(
+      const match = existing.find(
         (c) => !usedIds.has(c.id) && c.room_name === room.name && c.item_key === it.item_key,
       );
       if (match) {
         usedIds.add(match.id);
-        await insertItem(db, cleaningId, room, order++, match.item_key, match);
+        if (match.checked) {
+          await run(
+            db,
+            "UPDATE checklist_item SET room_sort = ?, sort_order = ? WHERE id = ?",
+            room.sort_order,
+            order,
+            match.id,
+          );
+        } else {
+          await run(
+            db,
+            "UPDATE checklist_item SET room_sort = ?, sort_order = ?, label = ?, needs_photo = ?, note = ? WHERE id = ?",
+            room.sort_order,
+            order,
+            it.label,
+            it.needs_photo,
+            it.note,
+            match.id,
+          );
+        }
       } else {
-        await insertItem(db, cleaningId, room, order++, it.item_key, it);
+        await insertItem(db, cleaningId, room, order, it.item_key, it);
       }
+      order++;
     }
     nextOrderByRoomName.set(room.name, order);
   }
 
-  // テンプレ／room_item から消えたチェック済み項目は、個別項目として元の間取りに残す
-  for (const c of checkedPool) {
+  // マッチしなかった既存項目: チェック済み or 写真添付があるものは個別項目として残し、位置だけ更新。
+  // それ以外（未チェック・写真なし）は安全に削除できる。
+  for (const c of existing) {
     if (usedIds.has(c.id)) continue;
-    const room = rooms.find((r) => r.name === c.room_name);
-    const roomSort = room ? room.sort_order : c.room_sort;
-    const order = nextOrderByRoomName.get(c.room_name) ?? 0;
-    nextOrderByRoomName.set(c.room_name, order + 1);
-    await insertItem(db, cleaningId, { name: c.room_name, sort_order: roomSort }, order, c.item_key, c);
+    if (c.checked || photoItemIds.has(c.id)) {
+      const room = rooms.find((r) => r.name === c.room_name);
+      const roomSort = room ? room.sort_order : c.room_sort;
+      const order = nextOrderByRoomName.get(c.room_name) ?? 0;
+      nextOrderByRoomName.set(c.room_name, order + 1);
+      await run(db, "UPDATE checklist_item SET room_sort = ?, sort_order = ? WHERE id = ?", roomSort, order, c.id);
+    } else {
+      await run(db, "DELETE FROM checklist_item WHERE id = ?", c.id);
+    }
   }
 }
 
