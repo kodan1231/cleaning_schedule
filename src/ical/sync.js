@@ -71,13 +71,15 @@ export async function syncProperty(env, propertyId) {
   let created = 0;
   let updated = 0;
   let cancelled = 0;
+  let reservationChanged = 0;
   const seen = new Set();
 
   for (const r of reservations) {
     seen.add(r.uid);
     const ex = await one(
       db,
-      "SELECT id, checkout_date FROM reservation WHERE property_id = ? AND ical_uid = ?",
+      `SELECT id, checkin_date, checkout_date, guest_hint, status, raw_text
+         FROM reservation WHERE property_id = ? AND ical_uid = ?`,
       propertyId,
       r.uid,
     );
@@ -100,19 +102,31 @@ export async function syncProperty(env, propertyId) {
       reservationId = meta.last_row_id;
     } else {
       reservationId = ex.id;
-      await run(
-        db,
-        `UPDATE reservation
-           SET checkin_date = ?, checkout_date = ?, guest_hint = ?,
-               status = 'active', raw_text = ?, synced_at = ?
-         WHERE id = ?`,
-        r.checkin_date,
-        r.checkout_date,
-        r.guest_hint,
-        r.raw,
-        nowIso(),
-        ex.id,
-      );
+      const changed =
+        ex.checkin_date !== r.checkin_date ||
+        ex.checkout_date !== r.checkout_date ||
+        ex.guest_hint !== r.guest_hint ||
+        ex.status !== "active" ||
+        ex.raw_text !== r.raw;
+      if (changed) {
+        await run(
+          db,
+          `UPDATE reservation
+             SET checkin_date = ?, checkout_date = ?, guest_hint = ?,
+                 status = 'active', raw_text = ?, synced_at = ?
+           WHERE id = ?`,
+          r.checkin_date,
+          r.checkout_date,
+          r.guest_hint,
+          r.raw,
+          nowIso(),
+          ex.id,
+        );
+        reservationChanged++;
+      } else {
+        // 内容に変化はないが、同期時刻の記録として synced_at のみ更新
+        await run(db, "UPDATE reservation SET synced_at = ? WHERE id = ?", nowIso(), ex.id);
+      }
       if (ex.checkout_date !== r.checkout_date) {
         updated += await moveCleaning(db, ex.id, r.checkout_date);
       }
@@ -153,10 +167,14 @@ export async function syncProperty(env, propertyId) {
     ]
       .filter(Boolean)
       .join(" / ") || null;
-  await writeLog(db, propertyId, "ok", reservations.length, created, updated + cancelled, note);
+  // 予約・清掃・チェックリストのいずれにも変更がなければ 'no_change'（D1 書き込みが無かった回）
+  const hasChanges =
+    created > 0 || updated > 0 || cancelled > 0 || refreshed > 0 || reservationChanged > 0;
+  const result = hasChanges ? "ok" : "no_change";
+  await writeLog(db, propertyId, result, reservations.length, created, updated + cancelled, note);
   return {
     propertyId,
-    result: "ok",
+    result,
     seen: reservations.length,
     created,
     updated,

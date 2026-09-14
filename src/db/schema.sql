@@ -209,7 +209,7 @@ CREATE TABLE IF NOT EXISTS sync_log (
   id                INTEGER PRIMARY KEY,
   property_id       INTEGER REFERENCES property(id) ON DELETE CASCADE,
   run_at            TEXT    NOT NULL,
-  result            TEXT    NOT NULL CHECK (result IN ('ok','error')),
+  result            TEXT    NOT NULL CHECK (result IN ('ok','no_change','error')),
   reservations_seen INTEGER NOT NULL DEFAULT 0,
   cleanings_created INTEGER NOT NULL DEFAULT 0,
   cleanings_updated INTEGER NOT NULL DEFAULT 0,
@@ -231,7 +231,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '7');
+  ('schema_version', '8');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)

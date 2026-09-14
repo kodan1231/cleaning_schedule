@@ -82,9 +82,11 @@ admin.post("/properties/:id/sync", async (c) => {
     message: String(e?.message || e),
   }));
   const msg =
-    r.result === "ok"
-      ? `同期しました（予約 ${r.seen} / 生成 ${r.created} / 更新 ${r.updated} / キャンセル ${r.cancelled} / チェックリスト更新 ${r.refreshed || 0}）`
-      : `同期エラー: ${r.message}`;
+    r.result === "no_change"
+      ? `同期しました（変更なし・予約 ${r.seen} 件を確認）`
+      : r.result === "ok"
+        ? `同期しました（予約 ${r.seen} / 生成 ${r.created} / 更新 ${r.updated} / キャンセル ${r.cancelled} / チェックリスト更新 ${r.refreshed || 0}）`
+        : `同期エラー: ${r.message}`;
   return c.redirect(to("/admin", msg));
 });
 
@@ -92,8 +94,8 @@ admin.post("/sync-all", async (c) => {
   const body = await form(c);
   if (!body) return badReq(c);
   const results = await runScheduledSync(c.env);
-  const ok = results.filter((r) => r.result === "ok").length;
-  const ng = results.length - ok;
+  const ng = results.filter((r) => r.result === "error").length;
+  const ok = results.length - ng;
   return c.redirect(to("/admin", `全物件同期を実行（成功 ${ok} / 失敗 ${ng}）`));
 });
 

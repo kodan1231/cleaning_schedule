@@ -18,6 +18,13 @@ function backLink(href, label) {
   return html`<p><a href="${href}">&larr; ${label}</a></p>`;
 }
 
+// 同期結果（sync_log.result）の表示: ok=緑「OK」/ no_change=グレー「変更なし」/ error=オレンジ「エラー」
+function syncResultBadge(result) {
+  const cls = result === "ok" ? "done" : result === "no_change" ? "pending" : "in_progress";
+  const label = result === "ok" ? "OK" : result === "no_change" ? "変更なし" : "エラー";
+  return html`<span class="status-${cls}">${label}</span>`;
+}
+
 function fmtBytes(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -92,10 +99,7 @@ export function adminHome(c, { counts, properties, syncLogs = [], storage, msg }
                       </td>
                       <td>
                         ${p.last_sync
-                          ? html`${fmtDateTimeJst(p.last_sync)}
-                              <span class="status-${p.last_result === "ok" ? "done" : "in_progress"}">
-                                ${p.last_result === "ok" ? "OK" : "エラー"}
-                              </span>`
+                          ? html`${fmtDateTimeJst(p.last_sync)} ${syncResultBadge(p.last_result)}`
                           : html`<span class="muted">未同期</span>`}
                       </td>
                       <td>
@@ -128,11 +132,7 @@ export function adminHome(c, { counts, properties, syncLogs = [], storage, msg }
                     <tr>
                       <td class="sm">${fmtDateTimeJst(l.run_at)}</td>
                       <td class="sm">${l.property || html`<span class="muted">—</span>`}</td>
-                      <td>
-                        <span class="status-${l.result === "ok" ? "done" : "in_progress"}">
-                          ${l.result === "ok" ? "OK" : "エラー"}
-                        </span>
-                      </td>
+                      <td>${syncResultBadge(l.result)}</td>
                       <td class="sm">見 ${l.reservations_seen} / 生成 ${l.cleanings_created} / 更新 ${l.cleanings_updated}</td>
                       <td class="sm">${l.message || ""}</td>
                     </tr>

@@ -81,7 +81,9 @@ async function insertItem(db, cleaningId, room, sortOrder, key, it) {
  *   - 対応付けられなかった既存項目は、チェック済み・または写真が添付されている場合に限り
  *     個別項目として残す（削除しない）。それ以外（未チェック・写真なし）は安全に削除する。
  * 完了・キャンセル済みの清掃は対象外。
- * @returns 作り直した清掃 id の配列
+ * 各清掃について、実際に checklist_item を書き換えた場合だけ UPDATE/INSERT/DELETE を発行する
+ * （値に変化がなければ何もしない。iCal 同期の D1 書き込みを減らすための差分化）。
+ * @returns 実際に何か書き換えた清掃 id の配列
  */
 export async function resnapshotPending(db, propertyId) {
   const cleanings = await all(
@@ -89,12 +91,14 @@ export async function resnapshotPending(db, propertyId) {
     "SELECT id FROM cleaning WHERE property_id = ? AND status IN ('pending','in_progress')",
     propertyId,
   );
+  const changed = [];
   for (const cl of cleanings) {
-    await mergeSnapshot(db, cl.id, propertyId);
+    if (await mergeSnapshot(db, cl.id, propertyId)) changed.push(cl.id);
   }
-  return cleanings.map((c) => c.id);
+  return changed;
 }
 
+/** @returns 何か書き換えた（INSERT/UPDATE/DELETE を発行した）ら true */
 async function mergeSnapshot(db, cleaningId, propertyId) {
   const existing = await all(db, "SELECT * FROM checklist_item WHERE cleaning_id = ?", cleaningId);
   const photoItemIds = new Set(
@@ -114,6 +118,7 @@ async function mergeSnapshot(db, cleaningId, propertyId) {
     propertyId,
   );
   const nextOrderByRoomName = new Map();
+  let changed = false;
 
   for (const room of rooms) {
     let order = 0;
@@ -124,14 +129,23 @@ async function mergeSnapshot(db, cleaningId, propertyId) {
       if (match) {
         usedIds.add(match.id);
         if (match.checked) {
-          await run(
-            db,
-            "UPDATE checklist_item SET room_sort = ?, sort_order = ? WHERE id = ?",
-            room.sort_order,
-            order,
-            match.id,
-          );
-        } else {
+          if (match.room_sort !== room.sort_order || match.sort_order !== order) {
+            await run(
+              db,
+              "UPDATE checklist_item SET room_sort = ?, sort_order = ? WHERE id = ?",
+              room.sort_order,
+              order,
+              match.id,
+            );
+            changed = true;
+          }
+        } else if (
+          match.room_sort !== room.sort_order ||
+          match.sort_order !== order ||
+          match.label !== it.label ||
+          !!match.needs_photo !== !!it.needs_photo ||
+          match.note !== it.note
+        ) {
           await run(
             db,
             "UPDATE checklist_item SET room_sort = ?, sort_order = ?, label = ?, needs_photo = ?, note = ? WHERE id = ?",
@@ -142,9 +156,11 @@ async function mergeSnapshot(db, cleaningId, propertyId) {
             it.note,
             match.id,
           );
+          changed = true;
         }
       } else {
         await insertItem(db, cleaningId, room, order, it.item_key, it);
+        changed = true;
       }
       order++;
     }
@@ -160,11 +176,17 @@ async function mergeSnapshot(db, cleaningId, propertyId) {
       const roomSort = room ? room.sort_order : c.room_sort;
       const order = nextOrderByRoomName.get(c.room_name) ?? 0;
       nextOrderByRoomName.set(c.room_name, order + 1);
-      await run(db, "UPDATE checklist_item SET room_sort = ?, sort_order = ? WHERE id = ?", roomSort, order, c.id);
+      if (c.room_sort !== roomSort || c.sort_order !== order) {
+        await run(db, "UPDATE checklist_item SET room_sort = ?, sort_order = ? WHERE id = ?", roomSort, order, c.id);
+        changed = true;
+      }
     } else {
       await run(db, "DELETE FROM checklist_item WHERE id = ?", c.id);
+      changed = true;
     }
   }
+
+  return changed;
 }
 
 /** checklist_item を間取り別にまとめる。[{ name, done, total, items }]（room_sort 順） */
