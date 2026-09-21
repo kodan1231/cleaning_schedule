@@ -8,7 +8,7 @@ const EVENT_LABEL = {
   start: "開始",
   complete: "完了",
   reopen: "作業中に戻す",
-  note: "メモ更新",
+  note: "全体メモ更新",
   room_memo: "部屋メモ更新",
   check: "チェック",
   uncheck: "チェック解除",
@@ -323,11 +323,17 @@ export function cleaningDetailPage(
       <form method="post" action="/cleanings/${cl.id}/note" class="card form">
         ${csrf(c)}
         <label class="fld">
-          この清掃のメモ（この回だけの記録。次回には引き継がれません）
-          <textarea name="note" rows="3" maxlength="2000">${cl.note || ""}</textarea>
+          全体メモ（次回以降に引き継がれます）
+          <textarea name="note" rows="3" maxlength="2000">${cl.property_memo || ""}</textarea>
         </label>
-        <p class="muted sm">次回以降に引き継ぐ内容は、下の各部屋を開いて「部屋のメモ」に書いてください。</p>
-        <button type="submit" class="secondary">メモを保存</button>
+        <div class="room-memo-foot">
+          <button type="submit" class="secondary">メモを保存</button>
+          ${cl.property_memo && cl.property_memo_updated_at
+            ? html`<span class="muted sm">
+                最終更新: ${cl.property_memo_updated_by_name ? `${cl.property_memo_updated_by_name} ` : ""}${fmtDateTimeJst(cl.property_memo_updated_at)}
+              </span>`
+            : raw("")}
+        </div>
       </form>
 
       ${statusActions(c, cl, incomplete)}

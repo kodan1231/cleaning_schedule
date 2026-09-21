@@ -186,12 +186,15 @@ async function loadCleaning(c, id) {
     c.env.DB,
     `SELECT c.*, p.name AS property_name, p.checkout_time,
             r.guest_hint AS guest_hint, r.checkin_date AS checkin_date, r.checkout_date AS checkout_date,
-            su.name AS started_by_name, cu.name AS completed_by_name
+            su.name AS started_by_name, cu.name AS completed_by_name,
+            p.memo AS property_memo, p.memo_updated_at AS property_memo_updated_at,
+            mu.name AS property_memo_updated_by_name
      FROM cleaning c
      JOIN property p ON p.id = c.property_id
      LEFT JOIN reservation r ON r.id = c.reservation_id
      LEFT JOIN user su ON su.id = c.started_by
      LEFT JOIN user cu ON cu.id = c.completed_by
+     LEFT JOIN user mu ON mu.id = p.memo_updated_by
      WHERE c.id = ?`,
     id,
   );
@@ -308,15 +311,26 @@ cleanings.post("/:id/note", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
   const body = await form(c);
   if (!body) return badReq(c);
-  const cl = await one(c.env.DB, "SELECT id FROM cleaning WHERE id = ?", id);
+  const cl = await one(c.env.DB, "SELECT id, property_id FROM cleaning WHERE id = ?", id);
   if (!cl) return c.notFound();
   const note = String(body.note || "").trim().slice(0, 2000);
+  const uid = c.get("user").id;
+  // 全体メモは物件に保存して次回以降に引き継ぐ。cleaning.note にも同じ内容を残し、
+  // 履歴・CSV で「その清掃で保存したメモ」として参照できるようにする。
+  await run(
+    c.env.DB,
+    "UPDATE property SET memo = ?, memo_updated_by = ?, memo_updated_at = ? WHERE id = ?",
+    note || null,
+    uid,
+    nowIso(),
+    cl.property_id,
+  );
   await run(c.env.DB, "UPDATE cleaning SET note = ? WHERE id = ?", note || null, id);
-  await logEvent(c.env.DB, id, "note", c.get("user").id);
+  await logEvent(c.env.DB, id, "note", uid);
   return c.redirect(to(`/cleanings/${id}`, "メモを保存しました"));
 });
 
-// ── 部屋ごとの引き継ぎメモ（room.memo。次回以降の清掃にも表示される）──
+// ── 全体メモ（上の /:id/note）は property.memo、こちらは部屋ごと。どちらも次回以降の清掃にも表示される ──
 cleanings.post("/:id/rooms/:rid/memo", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
   const rid = parseInt(c.req.param("rid"), 10);

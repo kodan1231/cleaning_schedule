@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS property (
   checkout_time TEXT    NOT NULL DEFAULT '10:00',
   template_id   INTEGER REFERENCES checklist_template(id),
   note          TEXT,
-  created_at    TEXT    NOT NULL
+  created_at    TEXT    NOT NULL,
+  memo            TEXT,                   -- 物件の全体メモ（引き継ぎ。マイグレーション 0010）。note は管理画面用で別物
+  memo_updated_by INTEGER REFERENCES user(id),
+  memo_updated_at TEXT
 );
 
 -- ─────────────────────────────────────────────
@@ -234,7 +237,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '9');
+  ('schema_version', '10');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)
