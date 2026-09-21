@@ -47,7 +47,7 @@ document.addEventListener("submit", (ev) => {
   const form = ev.target;
   const btn = ev.submitter;
   const action = (btn && btn.getAttribute("formaction")) || form.action;
-  if (!action || !/\/move$/.test(new URL(action, location.href).pathname)) return;
+  if (!action || !/\/(move|memo)$/.test(new URL(action, location.href).pathname)) return;
   saveUiState();
 });
 

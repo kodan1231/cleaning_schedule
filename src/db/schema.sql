@@ -66,7 +66,10 @@ CREATE TABLE IF NOT EXISTS room (
   group_label TEXT,                       -- 未使用（旧・階グループ。0004 で追加、間取りごとの折りたたみ導入で廃止）
   sort_order  INTEGER NOT NULL DEFAULT 0,
   template_id INTEGER REFERENCES checklist_template(id),
-  created_at  TEXT    NOT NULL
+  created_at  TEXT    NOT NULL,
+  memo            TEXT,                   -- 部屋ごとの引き継ぎメモ（マイグレーション 0009）。次回以降の清掃にも表示
+  memo_updated_by INTEGER REFERENCES user(id),
+  memo_updated_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_room_property ON room(property_id, sort_order);
 
@@ -162,7 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_item_cleaning ON checklist_item(cleaning_id, room
 
 -- ─────────────────────────────────────────────
 -- 作業イベントログ（実作業時間の計測・履歴。追記のみ・不変）
---   kind: start | complete | reopen | note | check | uncheck | photo_add | photo_delete
+--   kind: start | complete | reopen | note | room_memo | check | uncheck | photo_add | photo_delete
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS cleaning_event (
   id          INTEGER PRIMARY KEY,
@@ -231,7 +234,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '8');
+  ('schema_version', '9');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)

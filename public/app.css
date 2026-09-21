@@ -467,6 +467,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .room-name { font-weight: 700; }
 .room-done { color: var(--green); font-weight: 700; }
 .room-done::after { content: " ✓"; }
+.room-memo-flag { font-size: 12px; font-weight: 400; color: var(--orange); margin-left: 6px; }
+.room-memo { padding: 10px 14px; border-bottom: 1px solid var(--line); background: #fffaf0; }
+.room-memo-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .room-ref-photos { padding: 0 14px 10px; }
 .room-ref-photos > .muted { display: block; margin-bottom: 6px; }
 

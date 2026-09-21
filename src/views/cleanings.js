@@ -9,6 +9,7 @@ const EVENT_LABEL = {
   complete: "完了",
   reopen: "作業中に戻す",
   note: "メモ更新",
+  room_memo: "部屋メモ更新",
   check: "チェック",
   uncheck: "チェック解除",
   photo_add: "写真追加",
@@ -242,9 +243,12 @@ export function dashboardPage(c, opts) {
 // ─────────────────────────────────────────────
 export function cleaningDetailPage(
   c,
-  { cleaning: cl, items, events = [], photos = [], roomPhotos = [], eventsQuery = {}, msg },
+  { cleaning: cl, items, events = [], photos = [], roomPhotos = [], roomMemos = [], eventsQuery = {}, msg },
 ) {
   const rooms = groupByRoom(items);
+  // 部屋名 → 部屋（引き継ぎメモ付き）。同名がある場合は sort_order が先のものを採用
+  const roomByName = new Map();
+  for (const r of roomMemos) if (!roomByName.has(r.name)) roomByName.set(r.name, r);
   const roomPhotosByName = new Map();
   for (const p of roomPhotos) {
     if (!roomPhotosByName.has(p.room_name)) roomPhotosByName.set(p.room_name, []);
@@ -319,9 +323,10 @@ export function cleaningDetailPage(
       <form method="post" action="/cleanings/${cl.id}/note" class="card form">
         ${csrf(c)}
         <label class="fld">
-          メモ（引き継ぎ・気づき）
+          この清掃のメモ（この回だけの記録。次回には引き継がれません）
           <textarea name="note" rows="3" maxlength="2000">${cl.note || ""}</textarea>
         </label>
+        <p class="muted sm">次回以降に引き継ぐ内容は、下の各部屋を開いて「部屋のメモ」に書いてください。</p>
         <button type="submit" class="secondary">メモを保存</button>
       </form>
 
@@ -335,7 +340,7 @@ export function cleaningDetailPage(
         ? html`<div class="card muted">
             この清掃にはチェック項目がありません（物件に間取り／テンプレート未設定）。
           </div>`
-        : rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName))}
+        : rooms.map((r) => roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName, roomByName.get(r.name)))}
       ${total && !editable
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
         : raw("")}
@@ -439,16 +444,20 @@ export function cleaningDetailPage(
   });
 }
 
-function roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName) {
+function roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName, roomInfo) {
   // 初期表示は折り畳み。作業する部屋を開いてもらう。
   const refPhotos = roomPhotosByName.get(r.name) || [];
   return html`
     <details class="card room-block" data-room-block="${r.name}">
       <summary class="room-sum">
-        <span class="room-name">${r.name}</span>
+        <span class="room-name">
+          ${r.name}
+          ${roomInfo?.memo ? html`<span class="room-memo-flag" title="引き継ぎメモあり">📝メモあり</span>` : raw("")}
+        </span>
         <span class="muted sm ${r.total > 0 && r.done === r.total ? "room-done" : ""}"
               data-room-prog="${r.name}">${r.done}/${r.total}</span>
       </summary>
+      ${roomInfo ? roomMemoForm(c, cl, roomInfo) : raw("")}
       ${refPhotos.length
         ? html`<div class="room-ref-photos">
             <span class="muted sm">仕上がりイメージ</span>
@@ -459,6 +468,27 @@ function roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName) {
         ${r.items.map((it) => checkItem(c, cl, it, editable, photosByItem.get(it.id) || []))}
       </ul>
     </details>
+  `;
+}
+
+/** 部屋ごとの引き継ぎメモ。room.memo に保存され、次回以降の清掃でも同じ内容が表示される */
+function roomMemoForm(c, cl, room) {
+  return html`
+    <form method="post" action="/cleanings/${cl.id}/rooms/${room.id}/memo" class="room-memo">
+      ${csrf(c)}
+      <label class="fld">
+        部屋のメモ（次回以降に引き継がれます）
+        <textarea name="memo" rows="2" maxlength="2000" placeholder="例: 排水口が詰まりやすい／備品の置き場所 など">${room.memo || ""}</textarea>
+      </label>
+      <div class="room-memo-foot">
+        <button type="submit" class="secondary">メモを保存</button>
+        ${room.memo && room.memo_updated_at
+          ? html`<span class="muted sm">
+              最終更新: ${room.memo_updated_by_name ? `${room.memo_updated_by_name} ` : ""}${fmtDateTimeJst(room.memo_updated_at)}
+            </span>`
+          : raw("")}
+      </div>
+    </form>
   `;
 }
 

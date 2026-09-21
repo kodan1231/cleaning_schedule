@@ -224,6 +224,13 @@ cleanings.get("/:id", async (c) => {
      WHERE r.property_id = ? ORDER BY rp.uploaded_at, rp.id`,
     cleaning.property_id,
   );
+  const roomMemos = await all(
+    c.env.DB,
+    `SELECT r.id, r.name, r.memo, r.memo_updated_at, u.name AS memo_updated_by_name
+     FROM room r LEFT JOIN user u ON u.id = r.memo_updated_by
+     WHERE r.property_id = ? ORDER BY r.sort_order, r.id`,
+    cleaning.property_id,
+  );
   const eventsQuery = {
     all: c.req.query("events") === "all",
     user: c.req.query("euser") || "",
@@ -235,6 +242,7 @@ cleanings.get("/:id", async (c) => {
     events,
     photos,
     roomPhotos,
+    roomMemos,
     eventsQuery,
     msg: c.req.query("msg"),
   });
@@ -306,6 +314,30 @@ cleanings.post("/:id/note", async (c) => {
   await run(c.env.DB, "UPDATE cleaning SET note = ? WHERE id = ?", note || null, id);
   await logEvent(c.env.DB, id, "note", c.get("user").id);
   return c.redirect(to(`/cleanings/${id}`, "メモを保存しました"));
+});
+
+// ── 部屋ごとの引き継ぎメモ（room.memo。次回以降の清掃にも表示される）──
+cleanings.post("/:id/rooms/:rid/memo", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const rid = parseInt(c.req.param("rid"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const cl = await one(c.env.DB, "SELECT id, property_id FROM cleaning WHERE id = ?", id);
+  if (!cl) return c.notFound();
+  const room = await one(c.env.DB, "SELECT id, name FROM room WHERE id = ? AND property_id = ?", rid, cl.property_id);
+  if (!room) return c.notFound();
+  const memo = String(body.memo || "").trim().slice(0, 2000);
+  const uid = c.get("user").id;
+  await run(
+    c.env.DB,
+    "UPDATE room SET memo = ?, memo_updated_by = ?, memo_updated_at = ? WHERE id = ?",
+    memo || null,
+    uid,
+    nowIso(),
+    rid,
+  );
+  await logEvent(c.env.DB, id, "room_memo", uid, room.name);
+  return c.redirect(to(`/cleanings/${id}`, `${room.name}のメモを保存しました`));
 });
 
 // ── 清掃の削除（admin のみ。iCal 由来は次回同期で再作成される）──
