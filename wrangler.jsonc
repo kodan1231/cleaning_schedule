@@ -14,6 +14,7 @@
   // "r2_buckets": [
   //   { "binding": "PHOTOS", "bucket_name": "cleaning-schedule-photos" }
   // ],
-  "triggers": { "crons": ["0 */3 * * *"] },
+  // 毎日 JST 6:00（UTC 前日21:00）。iCal 同期は1日1回（docs/02 §1.4）
+  "triggers": { "crons": ["0 21 * * *"] },
   "vars": { "APP_TZ": "Asia/Tokyo", "APP_NAME": "民泊清掃" }
 }
