@@ -50,7 +50,7 @@ export async function uploadPhoto(c) {
     if (!it) return bad("項目が見つかりません", 400);
     itemId = it.id;
   } else if (String(body.kind || "") === "start") {
-    // 作業開始時の現状写真（一括管理。チェック項目にも部屋にも紐づかない）。
+    // 掃除前の写真（一括管理。チェック項目にも部屋にも紐づかない）。
     // room_name は今は送られないが、将来 部屋別に戻す場合のため対応だけ残す
     // （送られた場合はこの清掃のチェックリストに実在する間取り名だけ許可）。
     kind = "start";
@@ -115,7 +115,7 @@ export async function uploadPhoto(c) {
     id,
     "photo_add",
     c.get("user").id,
-    kind === "start" ? (roomName ? `現状写真: ${roomName}` : "現状写真") : itemId ? "項目写真" : null,
+    kind === "start" ? (roomName ? `掃除前の写真: ${roomName}` : "掃除前の写真") : itemId ? "項目写真" : null,
   );
 
   return wantsJson

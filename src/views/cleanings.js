@@ -271,7 +271,7 @@ export function cleaningDetailPage(
     if (!photosByItem.has(p.checklist_item_id)) photosByItem.set(p.checklist_item_id, []);
     photosByItem.get(p.checklist_item_id).push(p);
   }
-  // 下部の「写真」欄は従来どおりチェック項目の証跡写真のみ（現状撮影は専用セクションで表示）
+  // 下部の「写真」欄は従来どおりチェック項目の証跡写真のみ（掃除前の写真は専用セクションで表示）
   const photoGroups = groupPhotosByRoom(
     photos.filter((p) => p.kind !== "start"),
     items,
@@ -458,13 +458,13 @@ export function cleaningDetailPage(
 }
 
 /**
- * 作業開始時の現状撮影。部屋を分けず、まとめて何枚でも撮る（一括管理）。
+ * 掃除前の写真。部屋を分けず、まとめて何枚でも撮る（一括管理）。
  * 撮った写真は photo.kind='start' で保存される（下部の「写真」欄には出さず、ここでまとめて表示）。
  */
 function startPhotoSection(c, cl, startPhotos, editable) {
   return html`
     <div class="card">
-      <h2 class="sub" style="margin-top:0">現状撮影</h2>
+      <h2 class="sub" style="margin-top:0">掃除前</h2>
       <p class="muted sm">
         清掃前の状態をまとめて撮っておきます（部屋ごとの指定は不要）。
         ${startPhotos.length ? html`<span>${startPhotos.length}枚</span>` : raw("")}
@@ -483,7 +483,7 @@ function startCameraBtn(c, cleaningId) {
       <input type="hidden" name="kind" value="start" />
       <label class="photo-btn">
         <input type="file" name="full" accept="image/*" multiple />
-        <span>📷 現状写真を追加（複数選択可）</span>
+        <span>📷 掃除前の写真を追加（複数選択可）</span>
       </label>
       <noscript><button type="submit" class="secondary sm">アップロード</button></noscript>
     </form>
@@ -620,7 +620,7 @@ function photoStrip(list, size = "") {
       ${list.map(
         (p) => html`
           <a class="thumb" href="/photos/${p.id}?view=1">
-            ${p.kind === "start" ? html`<span class="thumb-tag">現状</span>` : raw("")}
+            ${p.kind === "start" ? html`<span class="thumb-tag">掃除前</span>` : raw("")}
             <img src="/photos/${p.id}?thumb=1&v=${encodeURIComponent(p.uploaded_at)}" alt="${p.caption || "写真"}" loading="lazy" />
           </a>
         `,

@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS photo (
   caption           TEXT,
   uploaded_by       INTEGER NOT NULL REFERENCES user(id),
   uploaded_at       TEXT    NOT NULL,
-  kind              TEXT    NOT NULL DEFAULT 'item' CHECK (kind IN ('item','start')), -- 0011: item=チェック項目写真 / start=作業開始時の現状写真
+  kind              TEXT    NOT NULL DEFAULT 'item' CHECK (kind IN ('item','start')), -- 0011: item=チェック項目写真 / start=掃除前の写真
   room_name         TEXT                                                              -- 0011: kind='start' 時の間取り名
 );
 CREATE INDEX IF NOT EXISTS idx_photo_cleaning ON photo(cleaning_id);
