@@ -38,6 +38,8 @@ export async function uploadPhoto(c) {
   if (cl.status === "cancelled") return bad("キャンセル済みの清掃には追加できません", 409);
 
   let itemId = null;
+  let kind = "item";
+  let roomName = null;
   if (body.item_id) {
     const it = await one(
       c.env.DB,
@@ -47,6 +49,18 @@ export async function uploadPhoto(c) {
     );
     if (!it) return bad("項目が見つかりません", 400);
     itemId = it.id;
+  } else if (body.room_name) {
+    // 作業開始時の現状写真（部屋単位。チェック項目には紐づかない）。
+    // room_name はこの清掃のチェックリストに実在する間取り名だけ許可する。
+    const room = await one(
+      c.env.DB,
+      "SELECT DISTINCT room_name FROM checklist_item WHERE cleaning_id = ? AND room_name = ?",
+      id,
+      String(body.room_name),
+    );
+    if (!room) return bad("間取りが見つかりません", 400);
+    kind = "start";
+    roomName = room.room_name;
   }
 
   const full = body.full;
@@ -68,8 +82,8 @@ export async function uploadPhoto(c) {
   const meta = await run(
     c.env.DB,
     `INSERT INTO photo
-       (property_id, cleaning_id, checklist_item_id, storage, content_type, size_bytes, caption, uploaded_by, uploaded_at)
-     VALUES (?, ?, ?, 'd1', 'image/jpeg', ?, ?, ?, ?)`,
+       (property_id, cleaning_id, checklist_item_id, storage, content_type, size_bytes, caption, uploaded_by, uploaded_at, kind, room_name)
+     VALUES (?, ?, ?, 'd1', 'image/jpeg', ?, ?, ?, ?, ?, ?)`,
     cl.property_id,
     id,
     itemId,
@@ -77,6 +91,8 @@ export async function uploadPhoto(c) {
     caption,
     c.get("user").id,
     nowIso(),
+    kind,
+    roomName,
   );
   const photoId = meta.last_row_id;
   await run(
@@ -91,7 +107,13 @@ export async function uploadPhoto(c) {
     photoId,
     thumbBuf,
   );
-  await logEvent(c.env.DB, id, "photo_add", c.get("user").id, itemId ? "項目写真" : null);
+  await logEvent(
+    c.env.DB,
+    id,
+    "photo_add",
+    c.get("user").id,
+    kind === "start" ? `現状写真: ${roomName}` : itemId ? "項目写真" : null,
+  );
 
   return wantsJson
     ? c.json({ ok: true, photoId })
@@ -111,7 +133,7 @@ photos.use("*", requireAuth());
 
 photos.get("/:id", async (c) => {
   const id = parseInt(c.req.param("id"), 10);
-  const kind = c.req.query("thumb") ? "thumb" : "full";
+  const blobKind = c.req.query("thumb") ? "thumb" : "full";
   const photo = await one(
     c.env.DB,
     `SELECT p.id, p.caption, p.uploaded_by, p.uploaded_at, p.cleaning_id,
@@ -150,19 +172,23 @@ photos.get("/:id", async (c) => {
     });
   }
 
-  const row = await one(
+  let row = await one(
     c.env.DB,
     "SELECT bytes FROM photo_blob WHERE photo_id = ? AND kind = ?",
     id,
-    kind,
+    blobKind,
   );
+  // full が古くて容量圧縮のため削除済みの場合は thumb にフォールバック（サムネのみ残す運用。§7.3）
+  if ((!row || row.bytes == null) && blobKind === "full") {
+    row = await one(c.env.DB, "SELECT bytes FROM photo_blob WHERE photo_id = ? AND kind = 'thumb'", id);
+  }
   if (!row || row.bytes == null) return c.notFound();
 
   let bytes = row.bytes;
   if (Array.isArray(bytes)) bytes = new Uint8Array(bytes);
   else if (bytes instanceof ArrayBuffer) bytes = new Uint8Array(bytes);
 
-  const etag = `"${id}-${kind}-${photo.uploaded_at}"`;
+  const etag = `"${id}-${blobKind}-${photo.uploaded_at}"`;
   if (c.req.header("if-none-match") === etag) return c.body(null, 304);
   return c.body(bytes, 200, {
     "Content-Type": "image/jpeg",
@@ -194,7 +220,7 @@ photos.post("/:id/delete", async (c) => {
 export async function loadPhotos(db, cleaningId) {
   return all(
     db,
-    `SELECT p.id, p.checklist_item_id, p.caption, p.uploaded_at, u.name AS uploaded_by_name
+    `SELECT p.id, p.checklist_item_id, p.kind, p.room_name, p.caption, p.uploaded_at, u.name AS uploaded_by_name
      FROM photo p LEFT JOIN user u ON u.id = p.uploaded_by
      WHERE p.cleaning_id = ?
      ORDER BY p.uploaded_at ASC, p.id ASC`,

@@ -408,6 +408,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .photos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .thumb {
   display: block;
+  position: relative;
   width: 84px;
   height: 84px;
   border-radius: 8px;
@@ -416,6 +417,18 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   background: #fafbfc;
 }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-tag {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
 
 .photo-form { margin: 6px 0 0; }
 .photo-form.busy { opacity: 0.6; pointer-events: none; }
@@ -475,6 +488,14 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 
 .photo-group + .photo-group { margin-top: 10px; }
 .photo-group > .muted { display: block; margin-bottom: 6px; }
+
+/* 現状撮影（作業開始時） */
+.start-photo-list { list-style: none; margin: 0; padding: 0; }
+.start-photo-list > li { padding: 8px 0; border-top: 1px solid var(--line); }
+.start-photo-list > li:first-child { border-top: none; padding-top: 0; }
+.start-photo-row { display: flex; align-items: center; gap: 8px; }
+.start-photo-row .room-name { flex: 1; min-width: 0; }
+.start-photo-list .photos { margin: 6px 0 0; }
 
 /* チェック項目（コンパクト） */
 .items { list-style: none; margin: 0; padding: 0; }

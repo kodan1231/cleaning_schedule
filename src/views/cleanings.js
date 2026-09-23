@@ -264,7 +264,14 @@ export function cleaningDetailPage(
   const running = cl.status === "in_progress";
 
   const photosByItem = new Map();
+  const startPhotosByRoom = new Map();
   for (const p of photos) {
+    if (p.kind === "start") {
+      if (!p.room_name) continue;
+      if (!startPhotosByRoom.has(p.room_name)) startPhotosByRoom.set(p.room_name, []);
+      startPhotosByRoom.get(p.room_name).push(p);
+      continue;
+    }
     if (!p.checklist_item_id) continue;
     if (!photosByItem.has(p.checklist_item_id)) photosByItem.set(p.checklist_item_id, []);
     photosByItem.get(p.checklist_item_id).push(p);
@@ -337,6 +344,7 @@ export function cleaningDetailPage(
       </form>
 
       ${statusActions(c, cl, incomplete)}
+      ${rooms.length ? startPhotoSection(c, cl, rooms, startPhotosByRoom, editable) : raw("")}
 
       <h2 class="sub">
         チェックリスト
@@ -450,6 +458,48 @@ export function cleaningDetailPage(
   });
 }
 
+/**
+ * 作業開始時の現状撮影。清掃を始める前に部屋ごとの状態を1枚以上撮っておく用途。
+ * 撮った写真は photo.kind='start' で保存され、下部の「写真」欄にも間取り単位で表示される。
+ */
+function startPhotoSection(c, cl, rooms, startPhotosByRoom, editable) {
+  return html`
+    <div class="card">
+      <h2 class="sub" style="margin-top:0">現状撮影</h2>
+      <p class="muted sm">清掃前の各部屋の状態を撮っておきます。</p>
+      <ul class="start-photo-list">
+        ${rooms.map((r) => {
+          const list = startPhotosByRoom.get(r.name) || [];
+          return html`
+            <li>
+              <div class="start-photo-row">
+                <span class="room-name">${r.name}</span>
+                ${list.length ? html`<span class="muted sm">${list.length}枚</span>` : raw("")}
+                ${editable ? roomStartCameraBtn(c, cl.id, r.name) : raw("")}
+              </div>
+              ${list.length ? photoStrip(list, "sm") : raw("")}
+            </li>
+          `;
+        })}
+      </ul>
+    </div>
+  `;
+}
+
+function roomStartCameraBtn(c, cleaningId, roomName) {
+  return html`
+    <form class="photo-form cam" method="post" action="/cleanings/${cleaningId}/photos"
+          enctype="multipart/form-data" data-cleaning="${cleaningId}" data-room="${roomName}">
+      ${csrf(c)}
+      <input type="hidden" name="room_name" value="${roomName}" />
+      <label class="cam-btn want" title="現状写真を追加">
+        <input type="file" name="full" accept="image/*" />
+        <span aria-hidden="true">📷</span>
+      </label>
+    </form>
+  `;
+}
+
 function roomBlock(c, cl, r, editable, photosByItem, roomPhotosByName, roomInfo) {
   // 初期表示は折り畳み。作業する部屋を開いてもらう。
   const refPhotos = roomPhotosByName.get(r.name) || [];
@@ -560,9 +610,11 @@ const UNGROUPED_ROOM = "未分類（間取り不明）";
 /** photo を、紐づくチェック項目の間取り単位でまとめる。[{ name, sort, photos }]（room_sort 順、未分類は末尾） */
 function groupPhotosByRoom(photos, items) {
   const roomByItemId = new Map(items.map((it) => [it.id, { name: it.room_name, sort: it.room_sort }]));
+  const roomSortByName = new Map(items.map((it) => [it.room_name, it.room_sort]));
   const map = new Map();
   for (const p of photos) {
-    const room = p.checklist_item_id ? roomByItemId.get(p.checklist_item_id) : null;
+    let room = p.checklist_item_id ? roomByItemId.get(p.checklist_item_id) : null;
+    if (!room && p.room_name) room = { name: p.room_name, sort: roomSortByName.get(p.room_name) ?? Infinity };
     const name = room ? room.name : UNGROUPED_ROOM;
     if (!map.has(name)) map.set(name, { sort: room ? room.sort : Infinity, photos: [] });
     map.get(name).photos.push(p);
@@ -578,6 +630,7 @@ function photoStrip(list, size = "") {
       ${list.map(
         (p) => html`
           <a class="thumb" href="/photos/${p.id}?view=1">
+            ${p.kind === "start" ? html`<span class="thumb-tag">現状</span>` : raw("")}
             <img src="/photos/${p.id}?thumb=1&v=${encodeURIComponent(p.uploaded_at)}" alt="${p.caption || "写真"}" loading="lazy" />
           </a>
         `,

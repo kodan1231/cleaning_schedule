@@ -5,6 +5,7 @@
 import { all, one, run } from "../db/queries.js";
 import { nowIso, todayJst, addDays } from "../lib/datetime.js";
 import { snapshotChecklist, resnapshotPending } from "../lib/checklist.js";
+import { purgeOldFullPhotos } from "../lib/photoRetention.js";
 import { parseEvents, classifyEvent } from "./parser.js";
 
 const UA = "cleaning-schedule/1.0 (+https://cleaning-schedule.kodan1231.workers.dev)";
@@ -31,6 +32,11 @@ export async function runScheduledSync(env) {
       await writeLog(env.DB, p.id, "error", 0, 0, 0, truncate(String(e?.message || e)));
       results.push({ propertyId: p.id, result: "error", message: String(e?.message || e) });
     }
+  }
+  try {
+    await purgeOldFullPhotos(env.DB);
+  } catch (e) {
+    console.error("写真の容量圧縮に失敗", e);
   }
   return results;
 }

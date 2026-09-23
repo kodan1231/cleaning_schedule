@@ -195,7 +195,9 @@ CREATE TABLE IF NOT EXISTS photo (
   size_bytes        INTEGER,
   caption           TEXT,
   uploaded_by       INTEGER NOT NULL REFERENCES user(id),
-  uploaded_at       TEXT    NOT NULL
+  uploaded_at       TEXT    NOT NULL,
+  kind              TEXT    NOT NULL DEFAULT 'item' CHECK (kind IN ('item','start')), -- 0011: item=チェック項目写真 / start=作業開始時の現状写真
+  room_name         TEXT                                                              -- 0011: kind='start' 時の間取り名
 );
 CREATE INDEX IF NOT EXISTS idx_photo_cleaning ON photo(cleaning_id);
 CREATE INDEX IF NOT EXISTS idx_photo_storage ON photo(storage);
@@ -237,7 +239,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '10');
+  ('schema_version', '11');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)
