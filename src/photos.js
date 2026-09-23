@@ -150,6 +150,19 @@ photos.get("/:id", async (c) => {
   if (c.req.query("view")) {
     const me = c.get("user");
     const canDelete = photo.uploaded_by === me.id || me.role === "admin";
+
+    // ids: 同じギャラリー（掃除前まとめ・部屋ごとの写真欄など）の写真ID一覧。
+    // 前へ/次へ・スワイプでの移動に使う（このリンクを踏んだ一覧内での並びを保つ）。
+    const ids = String(c.req.query("ids") || "")
+      .split(",")
+      .map((s) => parseInt(s, 10))
+      .filter(Number.isInteger);
+    const idx = ids.indexOf(id);
+    const prevId = idx > 0 ? ids[idx - 1] : null;
+    const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+    const idsQS = ids.length ? `&ids=${ids.join(",")}` : "";
+    const navLink = (pid) => (pid ? `/photos/${pid}?view=1${idsQS}` : null);
+
     return page(c, {
       title: "写真",
       appName: c.env.APP_NAME,
@@ -157,9 +170,22 @@ photos.get("/:id", async (c) => {
       csrf: c.get("csrf"),
       body: html`
         <p><a href="/cleanings/${photo.cleaning_id}">&larr; 清掃へ戻る</a></p>
-        <div class="photo-view">
+        <div class="photo-view" data-prev="${navLink(prevId) || ""}" data-next="${navLink(nextId) || ""}">
           <img src="/photos/${photo.id}?v=${encodeURIComponent(photo.uploaded_at)}" alt="${photo.caption || "写真"}" />
         </div>
+        ${ids.length > 1
+          ? html`
+              <div class="photo-view-nav">
+                ${prevId
+                  ? html`<a class="btn secondary" href="${navLink(prevId)}">&lsaquo; 前へ</a>`
+                  : html`<span class="btn secondary" style="visibility:hidden">&lsaquo; 前へ</span>`}
+                <span class="muted sm">${idx + 1} / ${ids.length}</span>
+                ${nextId
+                  ? html`<a class="btn secondary" href="${navLink(nextId)}">次へ &rsaquo;</a>`
+                  : html`<span class="btn secondary" style="visibility:hidden">次へ &rsaquo;</span>`}
+              </div>
+            `
+          : raw("")}
         ${photo.caption ? html`<p>${photo.caption}</p>` : raw("")}
         <p class="muted sm">${photo.uploaded_by_name || "?"}・${photo.uploaded_at}</p>
         ${canDelete

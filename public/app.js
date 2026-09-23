@@ -261,3 +261,45 @@ async function makeJpeg(file, maxEdge, qualities, sizeCap) {
   }
   return blob;
 }
+
+// ── 写真ビューア: スワイプ / 矢印キーで前後の写真に移動 ──
+// data-prev / data-next は同じギャラリー内の隣の写真への URL（無ければ空文字）。
+// ボタンでも移動できるので、これは無くても操作できる補助機能。
+(() => {
+  const view = document.querySelector(".photo-view");
+  if (!view) return;
+  const prevHref = view.dataset.prev || null;
+  const nextHref = view.dataset.next || null;
+  if (!prevHref && !nextHref) return;
+
+  let startX = null;
+  let startY = null;
+  view.addEventListener(
+    "touchstart",
+    (ev) => {
+      const t = ev.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+    },
+    { passive: true },
+  );
+  view.addEventListener(
+    "touchend",
+    (ev) => {
+      if (startX == null) return;
+      const t = ev.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      startX = null;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      if (dx < 0 && nextHref) location.href = nextHref;
+      else if (dx > 0 && prevHref) location.href = prevHref;
+    },
+    { passive: true },
+  );
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowRight" && nextHref) location.href = nextHref;
+    else if (ev.key === "ArrowLeft" && prevHref) location.href = prevHref;
+  });
+})();

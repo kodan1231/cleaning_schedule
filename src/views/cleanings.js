@@ -614,12 +614,14 @@ function groupPhotosByRoom(photos, items) {
     .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
 }
 
+// ids: このストリップ内の写真IDをまとめて渡し、写真ビューアで前へ/次へ・スワイプ移動できるようにする
 function photoStrip(list, size = "") {
+  const ids = list.map((p) => p.id).join(",");
   return html`
     <div class="photos ${size === "sm" ? "photos-sm" : ""}">
       ${list.map(
         (p) => html`
-          <a class="thumb" href="/photos/${p.id}?view=1">
+          <a class="thumb" href="/photos/${p.id}?view=1&ids=${ids}">
             ${p.kind === "start" ? html`<span class="thumb-tag">掃除前</span>` : raw("")}
             <img src="/photos/${p.id}?thumb=1&v=${encodeURIComponent(p.uploaded_at)}" alt="${p.caption || "写真"}" loading="lazy" />
           </a>
