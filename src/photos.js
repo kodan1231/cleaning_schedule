@@ -173,6 +173,7 @@ photos.get("/:id", async (c) => {
         <div class="photo-view" data-prev="${navLink(prevId) || ""}" data-next="${navLink(nextId) || ""}">
           <img src="/photos/${photo.id}?v=${encodeURIComponent(photo.uploaded_at)}" alt="${photo.caption || "写真"}" />
         </div>
+        <p class="muted sm photo-view-hint">タップで拡大・縮小</p>
         ${ids.length > 1
           ? html`
               <div class="photo-view-nav">

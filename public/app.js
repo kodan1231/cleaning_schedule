@@ -262,12 +262,19 @@ async function makeJpeg(file, maxEdge, qualities, sizeCap) {
   return blob;
 }
 
-// ── 写真ビューア: スワイプ / 矢印キーで前後の写真に移動 ──
-// data-prev / data-next は同じギャラリー内の隣の写真への URL（無ければ空文字）。
-// ボタンでも移動できるので、これは無くても操作できる補助機能。
+// ── 写真ビューア ──
+// - タップで拡大/縮小（初期状態は縦横とも画面内に収めて全体を表示）
+// - 拡大していない時だけ: スワイプ / 矢印キーで前後の写真に移動
+//   data-prev / data-next は同じギャラリー内の隣の写真への URL（無ければ空文字）。
+//   ボタンでも移動できるので、これは無くても操作できる補助機能。
 (() => {
   const view = document.querySelector(".photo-view");
   if (!view) return;
+  const img = view.querySelector("img");
+  if (img) {
+    img.addEventListener("click", () => view.classList.toggle("zoomed"));
+  }
+
   const prevHref = view.dataset.prev || null;
   const nextHref = view.dataset.next || null;
   if (!prevHref && !nextHref) return;
@@ -286,7 +293,7 @@ async function makeJpeg(file, maxEdge, qualities, sizeCap) {
   view.addEventListener(
     "touchend",
     (ev) => {
-      if (startX == null) return;
+      if (startX == null || view.classList.contains("zoomed")) return;
       const t = ev.changedTouches[0];
       const dx = t.clientX - startX;
       const dy = t.clientY - startY;
@@ -299,6 +306,7 @@ async function makeJpeg(file, maxEdge, qualities, sizeCap) {
   );
 
   document.addEventListener("keydown", (ev) => {
+    if (view.classList.contains("zoomed")) return;
     if (ev.key === "ArrowRight" && nextHref) location.href = nextHref;
     else if (ev.key === "ArrowLeft" && prevHref) location.href = prevHref;
   });
