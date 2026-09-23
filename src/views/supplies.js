@@ -11,11 +11,12 @@ function flash(msg) {
 }
 
 export function suppliesPage(c, { properties, selectedPropertyId, items, isAdmin, msg }) {
+  const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
   return authedPage(c, {
-    title: "備品",
+    title: selectedProperty ? `${selectedProperty.name}の備品` : "備品",
     active: "supplies",
     body: html`
-      <h1>備品</h1>
+      <h1>${selectedProperty ? html`${selectedProperty.name}の備品` : "備品"}</h1>
       ${flash(msg)}
 
       ${properties.length === 0

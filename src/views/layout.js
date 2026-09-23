@@ -15,7 +15,6 @@ export function layout({ title, user, csrf, active, body, appName = "民泊清�
     ? html`
         <nav class="tabbar">
           <a href="/" class="${active === "home" ? "on" : ""}">清掃</a>
-          <a href="/history" class="${active === "history" ? "on" : ""}">履歴</a>
           <a href="/supplies" class="${active === "supplies" ? "on" : ""}">備品</a>
           ${user.role === "admin"
             ? html`<a href="/admin" class="${active === "admin" ? "on" : ""}">管理</a>`
