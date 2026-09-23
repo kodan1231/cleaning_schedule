@@ -169,41 +169,60 @@ document.addEventListener("click", (ev) => {
 });
 
 // ── 写真アップロード（クライアント縮小 → fetch）──
+// input が multiple の場合（現状撮影など）は選んだ枚数ぶん、1枚ずつ順にアップロードする。
+async function uploadOnePhoto(form, file) {
+  const full = await makeJpeg(file, 1600, [0.82, 0.7, 0.6, 0.5], 1450000);
+  const thumb = await makeJpeg(file, 400, [0.7], 300000);
+  // フォーム内の他の入力（item_id・kind・caption 等）もそのまま引き継ぐ
+  const fd = new FormData(form);
+  fd.set("full", full, "photo.jpg");
+  fd.set("thumb", thumb, "thumb.jpg");
+  const res = await fetch(form.action, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
+}
+
 document.addEventListener("change", async (ev) => {
   const input = ev.target;
   if (!input.matches(".photo-form input[type=file]")) return;
-  const file = input.files && input.files[0];
-  if (!file) return;
+  const files = input.files ? Array.from(input.files) : [];
+  if (!files.length) return;
   const form = input.closest(".photo-form");
   const label = form.querySelector("label span") || form.querySelector(".photo-btn");
   const orig = label ? label.textContent : "";
-  if (label) label.textContent = "…";
   form.classList.add("busy");
 
-  try {
-    const full = await makeJpeg(file, 1600, [0.82, 0.7, 0.6, 0.5], 1450000);
-    const thumb = await makeJpeg(file, 400, [0.7], 300000);
-    // フォーム内の他の入力（item_id・caption 等）もそのまま引き継ぐ
-    const fd = new FormData(form);
-    fd.set("full", full, "photo.jpg");
-    fd.set("thumb", thumb, "thumb.jpg");
-    if (label) label.textContent = "アップロード中…";
-    const res = await fetch(form.action, {
-      method: "POST",
-      headers: { Accept: "application/json" },
-      body: fd,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
+  let ok = 0;
+  let failed = 0;
+  for (let i = 0; i < files.length; i++) {
+    if (label) {
+      label.textContent =
+        files.length > 1 ? `アップロード中…（${i + 1}/${files.length}）` : "アップロード中…";
+    }
+    try {
+      await uploadOnePhoto(form, files[i]);
+      ok++;
+    } catch (e) {
+      console.warn("写真アップロード失敗", e);
+      failed++;
+    }
+  }
+
+  if (ok > 0) {
+    if (failed > 0) alert(`${ok}枚アップロードしました（${failed}枚は失敗しました）`);
     saveUiState();
     location.reload();
-  } catch (e) {
-    console.warn("写真アップロード失敗", e);
-    alert("写真のアップロードに失敗しました: " + (e.message || e));
-    if (label) label.textContent = orig;
-    form.classList.remove("busy");
-    input.value = "";
+    return;
   }
+
+  alert("写真のアップロードに失敗しました");
+  if (label) label.textContent = orig;
+  form.classList.remove("busy");
+  input.value = "";
 });
 
 function loadImage(file) {

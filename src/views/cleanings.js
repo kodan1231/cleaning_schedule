@@ -482,8 +482,8 @@ function startCameraBtn(c, cleaningId) {
       ${csrf(c)}
       <input type="hidden" name="kind" value="start" />
       <label class="photo-btn">
-        <input type="file" name="full" accept="image/*" />
-        <span>📷 現状写真を撮る</span>
+        <input type="file" name="full" accept="image/*" multiple />
+        <span>📷 現状写真を追加（複数選択可）</span>
       </label>
       <noscript><button type="submit" class="secondary sm">アップロード</button></noscript>
     </form>
