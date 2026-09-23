@@ -226,6 +226,34 @@ CREATE TABLE IF NOT EXISTS sync_log (
 CREATE INDEX IF NOT EXISTS idx_synclog_prop_time ON sync_log(property_id, run_at DESC);
 
 -- ─────────────────────────────────────────────
+-- 備品（消耗品）の在庫管理（マイグレーション 0012）
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS supply (
+  id          INTEGER PRIMARY KEY,
+  property_id INTEGER NOT NULL REFERENCES property(id) ON DELETE CASCADE,
+  name        TEXT    NOT NULL,
+  unit        TEXT,                      -- 例: 本・個・L（任意）
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  stock       INTEGER NOT NULL DEFAULT 0, -- 現在の在庫数（最新の supply_log を反映したスナップショット）
+  note        TEXT,                       -- 最新更新時の備考
+  updated_by  INTEGER REFERENCES user(id),
+  updated_at  TEXT,
+  created_at  TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_supply_property ON supply(property_id, sort_order);
+
+-- 在庫数の更新履歴（追記のみ・不変）
+CREATE TABLE IF NOT EXISTS supply_log (
+  id         INTEGER PRIMARY KEY,
+  supply_id  INTEGER NOT NULL REFERENCES supply(id) ON DELETE CASCADE,
+  stock      INTEGER NOT NULL,           -- 更新後の在庫数
+  note       TEXT,
+  changed_by INTEGER REFERENCES user(id),
+  changed_at TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_supply_log_supply ON supply_log(supply_id, changed_at DESC);
+
+-- ─────────────────────────────────────────────
 -- 設定 / メタ（Key-Value）
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS app_meta (
@@ -239,7 +267,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '11');
+  ('schema_version', '12');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)

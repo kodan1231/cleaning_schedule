@@ -263,20 +263,19 @@ export function cleaningDetailPage(
   const durationMs = workDurationMs(events);
   const running = cl.status === "in_progress";
 
+  const startPhotos = photos.filter((p) => p.kind === "start");
   const photosByItem = new Map();
-  const startPhotosByRoom = new Map();
   for (const p of photos) {
-    if (p.kind === "start") {
-      if (!p.room_name) continue;
-      if (!startPhotosByRoom.has(p.room_name)) startPhotosByRoom.set(p.room_name, []);
-      startPhotosByRoom.get(p.room_name).push(p);
-      continue;
-    }
+    if (p.kind === "start") continue;
     if (!p.checklist_item_id) continue;
     if (!photosByItem.has(p.checklist_item_id)) photosByItem.set(p.checklist_item_id, []);
     photosByItem.get(p.checklist_item_id).push(p);
   }
-  const photoGroups = groupPhotosByRoom(photos, items);
+  // 下部の「写真」欄は従来どおりチェック項目の証跡写真のみ（現状撮影は専用セクションで表示）
+  const photoGroups = groupPhotosByRoom(
+    photos.filter((p) => p.kind !== "start"),
+    items,
+  );
 
   const showAllEvents = Boolean(eventsQuery.all || eventsQuery.user || eventsQuery.kind);
   const eventUsers = [...new Map(events.filter((e) => e.user_id).map((e) => [e.user_id, e.user_name])).entries()];
@@ -344,7 +343,7 @@ export function cleaningDetailPage(
       </form>
 
       ${statusActions(c, cl, incomplete)}
-      ${rooms.length ? startPhotoSection(c, cl, rooms, startPhotosByRoom, editable) : raw("")}
+      ${startPhotoSection(c, cl, startPhotos, editable)}
 
       <h2 class="sub">
         チェックリスト
@@ -359,7 +358,7 @@ export function cleaningDetailPage(
         ? html`<p class="muted sm">キャンセル済みのためチェックは変更できません。</p>`
         : raw("")}
 
-      <h2 class="sub">写真 <span class="muted sm">${photos.length}枚</span></h2>
+      <h2 class="sub">写真 <span class="muted sm">${photos.length - startPhotos.length}枚</span></h2>
       <div class="card">
         ${photoGroups.length
           ? photoGroups.map(
@@ -459,43 +458,34 @@ export function cleaningDetailPage(
 }
 
 /**
- * 作業開始時の現状撮影。清掃を始める前に部屋ごとの状態を1枚以上撮っておく用途。
- * 撮った写真は photo.kind='start' で保存され、下部の「写真」欄にも間取り単位で表示される。
+ * 作業開始時の現状撮影。部屋を分けず、まとめて何枚でも撮る（一括管理）。
+ * 撮った写真は photo.kind='start' で保存される（下部の「写真」欄には出さず、ここでまとめて表示）。
  */
-function startPhotoSection(c, cl, rooms, startPhotosByRoom, editable) {
+function startPhotoSection(c, cl, startPhotos, editable) {
   return html`
     <div class="card">
       <h2 class="sub" style="margin-top:0">現状撮影</h2>
-      <p class="muted sm">清掃前の各部屋の状態を撮っておきます。</p>
-      <ul class="start-photo-list">
-        ${rooms.map((r) => {
-          const list = startPhotosByRoom.get(r.name) || [];
-          return html`
-            <li>
-              <div class="start-photo-row">
-                <span class="room-name">${r.name}</span>
-                ${list.length ? html`<span class="muted sm">${list.length}枚</span>` : raw("")}
-                ${editable ? roomStartCameraBtn(c, cl.id, r.name) : raw("")}
-              </div>
-              ${list.length ? photoStrip(list, "sm") : raw("")}
-            </li>
-          `;
-        })}
-      </ul>
+      <p class="muted sm">
+        清掃前の状態をまとめて撮っておきます（部屋ごとの指定は不要）。
+        ${startPhotos.length ? html`<span>${startPhotos.length}枚</span>` : raw("")}
+      </p>
+      ${editable ? startCameraBtn(c, cl.id) : raw("")}
+      ${startPhotos.length ? photoStrip(startPhotos) : raw("")}
     </div>
   `;
 }
 
-function roomStartCameraBtn(c, cleaningId, roomName) {
+function startCameraBtn(c, cleaningId) {
   return html`
-    <form class="photo-form cam" method="post" action="/cleanings/${cleaningId}/photos"
-          enctype="multipart/form-data" data-cleaning="${cleaningId}" data-room="${roomName}">
+    <form class="photo-form" method="post" action="/cleanings/${cleaningId}/photos"
+          enctype="multipart/form-data" data-cleaning="${cleaningId}">
       ${csrf(c)}
-      <input type="hidden" name="room_name" value="${roomName}" />
-      <label class="cam-btn want" title="現状写真を追加">
+      <input type="hidden" name="kind" value="start" />
+      <label class="photo-btn">
         <input type="file" name="full" accept="image/*" />
-        <span aria-hidden="true">📷</span>
+        <span>📷 現状写真を撮る</span>
       </label>
+      <noscript><button type="submit" class="secondary sm">アップロード</button></noscript>
     </form>
   `;
 }

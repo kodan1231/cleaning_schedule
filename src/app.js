@@ -9,6 +9,7 @@ import { dashboard, cleanings } from "./cleanings.js";
 import { photos } from "./photos.js";
 import { roomPhotos } from "./room_photos.js";
 import { history } from "./history.js";
+import { supplies } from "./supplies.js";
 import { one, run, getMeta, ping } from "./db/queries.js";
 import {
   hashPin,
@@ -199,6 +200,7 @@ app.route("/cleanings", cleanings);
 app.route("/photos", photos);
 app.route("/room-photos", roomPhotos);
 app.route("/history", history);
+app.route("/supplies", supplies);
 
 // ─────────────────────────────────────────────
 // 管理（物件・テンプレート・ユーザー管理）

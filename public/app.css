@@ -489,14 +489,6 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .photo-group + .photo-group { margin-top: 10px; }
 .photo-group > .muted { display: block; margin-bottom: 6px; }
 
-/* 現状撮影（作業開始時） */
-.start-photo-list { list-style: none; margin: 0; padding: 0; }
-.start-photo-list > li { padding: 8px 0; border-top: 1px solid var(--line); }
-.start-photo-list > li:first-child { border-top: none; padding-top: 0; }
-.start-photo-row { display: flex; align-items: center; gap: 8px; }
-.start-photo-row .room-name { flex: 1; min-width: 0; }
-.start-photo-list .photos { margin: 6px 0 0; }
-
 /* チェック項目（コンパクト） */
 .items { list-style: none; margin: 0; padding: 0; }
 .chk-item { border-top: 1px solid var(--line); }
@@ -541,3 +533,33 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .photo-form.cam { flex: none; margin: 0; }
 .photos-sm { gap: 4px; padding: 2px 14px 8px; margin: 0; }
 .photos-sm .thumb { width: 56px; height: 56px; }
+
+/* 備品 */
+.supply-list { display: flex; flex-direction: column; gap: 8px; }
+.supply-row { padding: 12px 14px; }
+.supply-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.supply-name { font-weight: 700; }
+.supply-ops { display: flex; gap: 6px; margin: 0; }
+.supply-stock-form { display: flex; gap: 6px; margin: 8px 0 0; flex-wrap: wrap; }
+.supply-stock-form input[type="number"] {
+  width: 72px;
+  flex: none;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+.supply-stock-form input[type="text"] {
+  flex: 1;
+  min-width: 120px;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+.supply-edit { margin-top: 8px; }
+.supply-edit > summary { color: var(--muted); cursor: pointer; }

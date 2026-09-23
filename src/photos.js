@@ -49,18 +49,21 @@ export async function uploadPhoto(c) {
     );
     if (!it) return bad("項目が見つかりません", 400);
     itemId = it.id;
-  } else if (body.room_name) {
-    // 作業開始時の現状写真（部屋単位。チェック項目には紐づかない）。
-    // room_name はこの清掃のチェックリストに実在する間取り名だけ許可する。
-    const room = await one(
-      c.env.DB,
-      "SELECT DISTINCT room_name FROM checklist_item WHERE cleaning_id = ? AND room_name = ?",
-      id,
-      String(body.room_name),
-    );
-    if (!room) return bad("間取りが見つかりません", 400);
+  } else if (String(body.kind || "") === "start") {
+    // 作業開始時の現状写真（一括管理。チェック項目にも部屋にも紐づかない）。
+    // room_name は今は送られないが、将来 部屋別に戻す場合のため対応だけ残す
+    // （送られた場合はこの清掃のチェックリストに実在する間取り名だけ許可）。
     kind = "start";
-    roomName = room.room_name;
+    if (body.room_name) {
+      const room = await one(
+        c.env.DB,
+        "SELECT DISTINCT room_name FROM checklist_item WHERE cleaning_id = ? AND room_name = ?",
+        id,
+        String(body.room_name),
+      );
+      if (!room) return bad("間取りが見つかりません", 400);
+      roomName = room.room_name;
+    }
   }
 
   const full = body.full;
@@ -112,7 +115,7 @@ export async function uploadPhoto(c) {
     id,
     "photo_add",
     c.get("user").id,
-    kind === "start" ? `現状写真: ${roomName}` : itemId ? "項目写真" : null,
+    kind === "start" ? (roomName ? `現状写真: ${roomName}` : "現状写真") : itemId ? "項目写真" : null,
   );
 
   return wantsJson

@@ -6,7 +6,7 @@ import { html, raw, render } from "../lib/html.js";
  * @param {string} o.title      ページタイトル
  * @param {object} [o.user]     現在ユーザー { name, role }
  * @param {string} [o.csrf]     CSRF トークン（ログアウトフォーム用）
- * @param {string} [o.active]   タブバーのアクティブ項目 'home' | 'history' | 'admin'
+ * @param {string} [o.active]   タブバーのアクティブ項目 'home' | 'history' | 'supplies' | 'admin'
  * @param {object} o.body       html`` で生成した本文ノード
  * @param {string} [o.appName]  アプリ名
  */
@@ -16,6 +16,7 @@ export function layout({ title, user, csrf, active, body, appName = "民泊清�
         <nav class="tabbar">
           <a href="/" class="${active === "home" ? "on" : ""}">清掃</a>
           <a href="/history" class="${active === "history" ? "on" : ""}">履歴</a>
+          <a href="/supplies" class="${active === "supplies" ? "on" : ""}">備品</a>
           ${user.role === "admin"
             ? html`<a href="/admin" class="${active === "admin" ? "on" : ""}">管理</a>`
             : raw("")}
