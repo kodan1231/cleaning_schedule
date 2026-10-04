@@ -191,6 +191,12 @@ export function requireAuth() {
     }
     c.set("user", user);
     c.set("csrf", ensureCsrf(c));
+    // タブの未対応件数バッジ用（不足備品。有効な物件のみ）
+    const open = await one(
+      c.env.DB,
+      "SELECT COUNT(*) AS n FROM shortage s JOIN property p ON p.id = s.property_id WHERE s.status = 'open' AND p.active = 1",
+    );
+    c.set("openShortages", open?.n || 0);
     await next();
   };
 }

@@ -6,16 +6,18 @@ import { html, raw, render } from "../lib/html.js";
  * @param {string} o.title      ページタイトル
  * @param {object} [o.user]     現在ユーザー { name, role }
  * @param {string} [o.csrf]     CSRF トークン（ログアウトフォーム用）
- * @param {string} [o.active]   タブバーのアクティブ項目 'home' | 'history' | 'supplies' | 'admin'
+ * @param {string} [o.active]   タブバーのアクティブ項目 'home' | 'shortages' | 'admin'
  * @param {object} o.body       html`` で生成した本文ノード
  * @param {string} [o.appName]  アプリ名
  */
-export function layout({ title, user, csrf, active, body, appName = "民泊清掃" }) {
+export function layout({ title, user, csrf, active, body, appName = "民泊清掃", openShortages = 0 }) {
   const tabs = user
     ? html`
         <nav class="tabbar">
           <a href="/" class="${active === "home" ? "on" : ""}">清掃</a>
-          <a href="/supplies" class="${active === "supplies" ? "on" : ""}">備品</a>
+          <a href="/shortages" class="${active === "shortages" ? "on" : ""}">不足備品${openShortages > 0
+            ? html`<span class="tab-badge" data-open-shortages>${openShortages}</span>`
+            : raw("")}</a>
           ${user.role === "admin"
             ? html`<a href="/admin" class="${active === "admin" ? "on" : ""}">管理</a>`
             : raw("")}
@@ -76,7 +78,13 @@ export function page(c, opts, status = 200) {
 export function authedPage(c, opts, status = 200) {
   return page(
     c,
-    { ...opts, user: c.get("user"), csrf: c.get("csrf"), appName: c.env.APP_NAME },
+    {
+      ...opts,
+      user: c.get("user"),
+      csrf: c.get("csrf"),
+      appName: c.env.APP_NAME,
+      openShortages: c.get("openShortages") || 0,
+    },
     status,
   );
 }

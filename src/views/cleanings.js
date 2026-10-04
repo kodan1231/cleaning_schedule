@@ -342,6 +342,22 @@ export function cleaningDetailPage(
         </div>
       </form>
 
+      ${editable
+        ? html`
+            <form method="post" action="/cleanings/${cl.id}/shortages" class="card form shortage-form">
+              ${csrf(c)}
+              <label class="fld">
+                不足している備品（購入を依頼）
+                <input type="text" name="body" maxlength="200" placeholder="例: トイレットペーパーが残り2個" required />
+              </label>
+              <div class="room-memo-foot">
+                <button type="submit" class="secondary">不足品を登録</button>
+                <a class="muted sm" href="/shortages?property=${cl.property_id}">不足備品の一覧へ &rsaquo;</a>
+              </div>
+            </form>
+          `
+        : raw("")}
+
       ${statusActions(c, cl, incomplete)}
       ${startPhotoSection(c, cl, startPhotos, editable)}
 

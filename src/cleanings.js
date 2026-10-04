@@ -330,6 +330,30 @@ cleanings.post("/:id/note", async (c) => {
   return c.redirect(to(`/cleanings/${id}`, "メモを保存しました"));
 });
 
+// ── 不足備品の登録（清掃中に気づいたものを購入依頼として残す。一覧は /shortages）──
+cleanings.post("/:id/shortages", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const cl = await one(c.env.DB, "SELECT id, property_id, status FROM cleaning WHERE id = ?", id);
+  if (!cl) return c.notFound();
+  if (cl.status === "cancelled") {
+    return c.redirect(to(`/cleanings/${id}`, "キャンセル済みの清掃には登録できません"));
+  }
+  const text = String(body.body || "").trim().slice(0, 200);
+  if (!text) return c.redirect(to(`/cleanings/${id}`, "不足している備品を入力してください"));
+  await run(
+    c.env.DB,
+    "INSERT INTO shortage (property_id, cleaning_id, body, status, created_by, created_at) VALUES (?, ?, ?, 'open', ?, ?)",
+    cl.property_id,
+    id,
+    text,
+    c.get("user").id,
+    nowIso(),
+  );
+  return c.redirect(to(`/cleanings/${id}`, "不足備品を登録しました"));
+});
+
 // ── 全体メモ（上の /:id/note）は property.memo、こちらは部屋ごと。どちらも次回以降の清掃にも表示される ──
 cleanings.post("/:id/rooms/:rid/memo", async (c) => {
   const id = parseInt(c.req.param("id"), 10);

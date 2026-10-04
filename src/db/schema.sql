@@ -226,32 +226,20 @@ CREATE TABLE IF NOT EXISTS sync_log (
 CREATE INDEX IF NOT EXISTS idx_synclog_prop_time ON sync_log(property_id, run_at DESC);
 
 -- ─────────────────────────────────────────────
--- 備品（消耗品）の在庫管理（マイグレーション 0012）
+-- 不足備品（購入依頼メモ。マイグレーション 0013。在庫管理は廃止）
 -- ─────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS supply (
+CREATE TABLE IF NOT EXISTS shortage (
   id          INTEGER PRIMARY KEY,
   property_id INTEGER NOT NULL REFERENCES property(id) ON DELETE CASCADE,
-  name        TEXT    NOT NULL,
-  unit        TEXT,                      -- 例: 本・個・L（任意）
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  stock       INTEGER NOT NULL DEFAULT 0, -- 現在の在庫数（最新の supply_log を反映したスナップショット）
-  note        TEXT,                       -- 最新更新時の備考
-  updated_by  INTEGER REFERENCES user(id),
-  updated_at  TEXT,
-  created_at  TEXT    NOT NULL
+  cleaning_id INTEGER REFERENCES cleaning(id) ON DELETE SET NULL, -- 登録元の清掃（任意・参照用）
+  body        TEXT    NOT NULL,                                   -- 例: トイレットペーパーが残り2個
+  status      TEXT    NOT NULL DEFAULT 'open' CHECK (status IN ('open','done')),
+  created_by  INTEGER NOT NULL REFERENCES user(id),
+  created_at  TEXT    NOT NULL,
+  done_by     INTEGER REFERENCES user(id),
+  done_at     TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_supply_property ON supply(property_id, sort_order);
-
--- 在庫数の更新履歴（追記のみ・不変）
-CREATE TABLE IF NOT EXISTS supply_log (
-  id         INTEGER PRIMARY KEY,
-  supply_id  INTEGER NOT NULL REFERENCES supply(id) ON DELETE CASCADE,
-  stock      INTEGER NOT NULL,           -- 更新後の在庫数
-  note       TEXT,
-  changed_by INTEGER REFERENCES user(id),
-  changed_at TEXT    NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_supply_log_supply ON supply_log(supply_id, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_shortage_property_status ON shortage(property_id, status, created_at);
 
 -- ─────────────────────────────────────────────
 -- 設定 / メタ（Key-Value）
@@ -267,7 +255,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '12');
+  ('schema_version', '13');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)
