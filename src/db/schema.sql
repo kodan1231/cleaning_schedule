@@ -233,6 +233,7 @@ CREATE TABLE IF NOT EXISTS shortage (
   property_id INTEGER NOT NULL REFERENCES property(id) ON DELETE CASCADE,
   cleaning_id INTEGER REFERENCES cleaning(id) ON DELETE SET NULL, -- 登録元の清掃（任意・参照用）
   body        TEXT    NOT NULL,                                   -- 例: トイレットペーパーが残り2個
+  kind        TEXT    NOT NULL DEFAULT 'shortage' CHECK (kind IN ('shortage','damage')), -- 0014: shortage=不足 / damage=破損
   status      TEXT    NOT NULL DEFAULT 'open' CHECK (status IN ('open','done')),
   created_by  INTEGER NOT NULL REFERENCES user(id),
   created_at  TEXT    NOT NULL,
@@ -240,6 +241,23 @@ CREATE TABLE IF NOT EXISTS shortage (
   done_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_shortage_property_status ON shortage(property_id, status, created_at);
+
+-- 不足備品・破損の写真（0014）
+CREATE TABLE IF NOT EXISTS shortage_photo (
+  id           INTEGER PRIMARY KEY,
+  shortage_id  INTEGER NOT NULL REFERENCES shortage(id) ON DELETE CASCADE,
+  size_bytes   INTEGER,
+  uploaded_by  INTEGER NOT NULL REFERENCES user(id),
+  uploaded_at  TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_shortage_photo_shortage ON shortage_photo(shortage_id, uploaded_at);
+
+CREATE TABLE IF NOT EXISTS shortage_photo_blob (
+  shortage_photo_id INTEGER NOT NULL REFERENCES shortage_photo(id) ON DELETE CASCADE,
+  kind              TEXT    NOT NULL CHECK (kind IN ('full','thumb')),
+  bytes             BLOB    NOT NULL,
+  PRIMARY KEY (shortage_photo_id, kind)
+);
 
 -- ─────────────────────────────────────────────
 -- 設定 / メタ（Key-Value）
@@ -255,7 +273,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 -- max_users は廃止（2026-09-08 人数上限なし）。既存 DB の行は無害なので残置。
 INSERT OR IGNORE INTO app_meta (key, value) VALUES
   ('registration_open', '1'),
-  ('schema_version', '13');
+  ('schema_version', '14');
 
 -- サンプルテンプレ（id=1 固定。実項目は運用開始後に admin が UI で追加）
 INSERT OR IGNORE INTO checklist_template (id, name, is_base, property_id, created_at, updated_at)

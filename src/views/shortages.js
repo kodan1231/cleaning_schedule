@@ -15,10 +15,10 @@ export function shortagesPage(c, { properties, selectedPropertyId, items, isAdmi
   const open = items.filter((i) => i.status === "open");
   const done = items.filter((i) => i.status === "done");
   return authedPage(c, {
-    title: selectedProperty ? `${selectedProperty.name}の不足備品` : "不足備品",
+    title: selectedProperty ? `${selectedProperty.name}の不足・破損` : "不足・破損",
     active: "shortages",
     body: html`
-      <h1>${selectedProperty ? html`${selectedProperty.name}の不足備品` : "不足備品"}</h1>
+      <h1>${selectedProperty ? html`${selectedProperty.name}の不足・破損` : "不足・破損"}</h1>
       ${flash(msg)}
 
       ${properties.length === 0
@@ -60,12 +60,54 @@ export function shortagesPage(c, { properties, selectedPropertyId, items, isAdmi
   });
 }
 
+function photoThumbs(c, it) {
+  const me = c.get("user");
+  return html`
+    ${it.photos.length
+      ? html`
+          <div class="photos photos-sm shortage-photos">
+            ${it.photos.map(
+              (p) => html`
+                <div class="shortage-photo">
+                  <a class="thumb" href="/shortages/photos/${p.id}?view=1">
+                    <img src="/shortages/photos/${p.id}?thumb=1&v=${encodeURIComponent(p.uploaded_at)}" alt="写真" loading="lazy" />
+                  </a>
+                  ${p.uploaded_by === me.id || me.role === "admin"
+                    ? html`
+                        <form method="post" action="/shortages/photos/${p.id}/delete" class="shortage-photo-del"
+                              onsubmit="return confirm('この写真を削除しますか？')">
+                          ${csrf(c)}
+                          <button type="submit" class="linkbtn danger sm">削除</button>
+                        </form>
+                      `
+                    : raw("")}
+                </div>
+              `,
+            )}
+          </div>
+        `
+      : raw("")}
+    <form method="post" action="/shortages/${it.id}/photos" enctype="multipart/form-data" class="photo-form shortage-upload">
+      ${csrf(c)}
+      <label class="photo-btn">
+        <input type="file" name="full" accept="image/*" multiple />
+        <span>📷 写真を追加（複数可）</span>
+      </label>
+      <noscript><button type="submit" class="secondary sm">アップロード</button></noscript>
+    </form>
+  `;
+}
+
 function shortageRow(c, it, isAdmin) {
   const isDone = it.status === "done";
+  const isDamage = it.kind === "damage";
   return html`
     <div class="card shortage-row ${isDone ? "is-done" : ""}">
       <div class="shortage-head">
-        <span class="shortage-body">${it.body}</span>
+        <span class="shortage-body">
+          <span class="kind-badge ${isDamage ? "kind-damage" : "kind-shortage"}">${isDamage ? "破損" : "不足"}</span>
+          ${it.body}
+        </span>
         ${isAdmin
           ? html`
               <form method="post" action="/shortages/${it.id}/${isDone ? "reopen" : "done"}" class="shortage-ops">
@@ -79,6 +121,7 @@ function shortageRow(c, it, isAdmin) {
         登録: ${it.created_by_name} ${fmtDateTimeJst(it.created_at)}
         ${isDone ? html`・対応: ${it.done_by_name || "?"} ${fmtDateTimeJst(it.done_at)}` : raw("")}
       </p>
+      ${photoThumbs(c, it)}
       ${isAdmin
         ? html`
             <form method="post" action="/shortages/${it.id}/delete" class="shortage-del"

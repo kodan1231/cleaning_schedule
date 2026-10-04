@@ -15,7 +15,7 @@ export function layout({ title, user, csrf, active, body, appName = "民泊清�
     ? html`
         <nav class="tabbar">
           <a href="/" class="${active === "home" ? "on" : ""}">清掃</a>
-          <a href="/shortages" class="${active === "shortages" ? "on" : ""}">不足備品${openShortages > 0
+          <a href="/shortages" class="${active === "shortages" ? "on" : ""}">不足・破損${openShortages > 0
             ? html`<span class="tab-badge" data-open-shortages>${openShortages}</span>`
             : raw("")}</a>
           ${user.role === "admin"

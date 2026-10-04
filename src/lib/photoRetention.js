@@ -10,27 +10,47 @@ export const RETENTION_DAYS = 30;
 
 /**
  * アップロードから RETENTION_DAYS 日以上経過した写真の full BLOB を削除する。
+ * 対象は清掃の写真（photo）と、不足・破損の写真（shortage_photo）の両方。
  * sync_log にも結果を残す（property_id は NULL。管理画面の同期ログに「—」として並ぶ）。
- * @returns 削除した件数
+ * @returns 削除した件数（清掃の写真＋不足・破損の写真）
  */
 export async function purgeOldFullPhotos(db) {
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400000)
     .toISOString()
     .replace(/\.\d{3}Z$/, "Z");
 
-  const before = await one(
+  const countPhotos = await one(
     db,
     `SELECT COUNT(*) AS n FROM photo_blob b
        JOIN photo p ON p.id = b.photo_id
       WHERE b.kind = 'full' AND p.uploaded_at < ?`,
     cutoff,
   );
-  const n = before?.n || 0;
-  if (n > 0) {
+  const countShortage = await one(
+    db,
+    `SELECT COUNT(*) AS n FROM shortage_photo_blob b
+       JOIN shortage_photo p ON p.id = b.shortage_photo_id
+      WHERE b.kind = 'full' AND p.uploaded_at < ?`,
+    cutoff,
+  );
+  const nPhotos = countPhotos?.n || 0;
+  const nShortage = countShortage?.n || 0;
+  const n = nPhotos + nShortage;
+
+  if (nPhotos > 0) {
     await run(
       db,
       `DELETE FROM photo_blob WHERE kind = 'full' AND photo_id IN (
          SELECT id FROM photo WHERE uploaded_at < ?
+       )`,
+      cutoff,
+    );
+  }
+  if (nShortage > 0) {
+    await run(
+      db,
+      `DELETE FROM shortage_photo_blob WHERE kind = 'full' AND shortage_photo_id IN (
+         SELECT id FROM shortage_photo WHERE uploaded_at < ?
        )`,
       cutoff,
     );
@@ -45,7 +65,7 @@ export async function purgeOldFullPhotos(db) {
       nowIso(),
       n > 0 ? "ok" : "no_change",
       n > 0
-        ? `写真圧縮: ${n}件のフル画像を削除（アップロードから${RETENTION_DAYS}日超・サムネイルは保持）`
+        ? `写真圧縮: ${n}件のフル画像を削除（清掃 ${nPhotos} / 不足・破損 ${nShortage}・${RETENTION_DAYS}日超・サムネイルは保持）`
         : "写真圧縮: 対象なし",
     );
   } catch (e) {

@@ -341,17 +341,20 @@ cleanings.post("/:id/shortages", async (c) => {
     return c.redirect(to(`/cleanings/${id}`, "キャンセル済みの清掃には登録できません"));
   }
   const text = String(body.body || "").trim().slice(0, 200);
-  if (!text) return c.redirect(to(`/cleanings/${id}`, "不足している備品を入力してください"));
+  if (!text) return c.redirect(to(`/cleanings/${id}`, "内容を入力してください"));
+  const kind = String(body.kind || "") === "damage" ? "damage" : "shortage";
   await run(
     c.env.DB,
-    "INSERT INTO shortage (property_id, cleaning_id, body, status, created_by, created_at) VALUES (?, ?, ?, 'open', ?, ?)",
+    "INSERT INTO shortage (property_id, cleaning_id, body, kind, status, created_by, created_at) VALUES (?, ?, ?, ?, 'open', ?, ?)",
     cl.property_id,
     id,
     text,
+    kind,
     c.get("user").id,
     nowIso(),
   );
-  return c.redirect(to(`/cleanings/${id}`, "不足備品を登録しました"));
+  const msg = kind === "damage" ? "破損を登録しました。写真を追加できます" : "不足備品を登録しました。写真を追加できます";
+  return c.redirect(`/shortages?property=${cl.property_id}&msg=${encodeURIComponent(msg)}`);
 });
 
 // ── 全体メモ（上の /:id/note）は property.memo、こちらは部屋ごと。どちらも次回以降の清掃にも表示される ──

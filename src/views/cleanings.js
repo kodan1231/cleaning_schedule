@@ -346,13 +346,18 @@ export function cleaningDetailPage(
         ? html`
             <form method="post" action="/cleanings/${cl.id}/shortages" class="card form shortage-form">
               ${csrf(c)}
+              <fieldset class="kind-pick">
+                <legend class="muted sm">種類</legend>
+                <label><input type="radio" name="kind" value="shortage" checked /> 不足（購入を依頼）</label>
+                <label><input type="radio" name="kind" value="damage" /> 破損（報告）</label>
+              </fieldset>
               <label class="fld">
-                不足している備品（購入を依頼）
-                <input type="text" name="body" maxlength="200" placeholder="例: トイレットペーパーが残り2個" required />
+                内容
+                <input type="text" name="body" maxlength="200" placeholder="例: トイレットペーパーが残り2個／洗面台の蛇口が割れている" required />
               </label>
               <div class="room-memo-foot">
-                <button type="submit" class="secondary">不足品を登録</button>
-                <a class="muted sm" href="/shortages?property=${cl.property_id}">不足備品の一覧へ &rsaquo;</a>
+                <button type="submit" class="secondary">登録する</button>
+                <a class="muted sm" href="/shortages?property=${cl.property_id}">不足・破損の一覧へ &rsaquo;</a>
               </div>
             </form>
           `
