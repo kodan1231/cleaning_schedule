@@ -8,7 +8,7 @@ import { snapshotChecklist, resnapshotPending } from "../lib/checklist.js";
 import { purgeOldFullPhotos } from "../lib/photoRetention.js";
 import { parseEvents, classifyEvent } from "./parser.js";
 
-const UA = "cleaning-schedule/1.0 (+https://cleaning-schedule.kodan1231.workers.dev)";
+const UA = "cleaning-schedule/1.0 (+https://cleaning-schedule.tamahouse0930.workers.dev)";
 const FETCH_TIMEOUT_MS = 20000;
 const FETCH_TRIES = 3;
 const PAST_DAYS = 3;
