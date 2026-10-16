@@ -98,6 +98,12 @@ function photoThumbs(c, it) {
   `;
 }
 
+// 内容・種類の修正は登録者本人と admin
+function canEdit(c, it) {
+  const me = c.get("user");
+  return me.role === "admin" || it.created_by === me.id;
+}
+
 function shortageRow(c, it, isAdmin) {
   const isDone = it.status === "done";
   const isDamage = it.kind === "damage";
@@ -122,6 +128,26 @@ function shortageRow(c, it, isAdmin) {
         ${isDone ? html`・対応: ${it.done_by_name || "?"} ${fmtDateTimeJst(it.done_at)}` : raw("")}
       </p>
       ${photoThumbs(c, it)}
+      ${canEdit(c, it)
+        ? html`
+            <details class="shortage-edit">
+              <summary class="muted sm">内容・種類を修正</summary>
+              <form method="post" action="/shortages/${it.id}/edit" class="form sub-form">
+                ${csrf(c)}
+                <fieldset class="kind-pick">
+                  <legend class="muted sm">種類</legend>
+                  <label><input type="radio" name="kind" value="shortage" ${isDamage ? "" : "checked"} /> 不足（購入を依頼）</label>
+                  <label><input type="radio" name="kind" value="damage" ${isDamage ? "checked" : ""} /> 破損（報告）</label>
+                </fieldset>
+                <label class="fld">
+                  内容
+                  <input type="text" name="body" value="${it.body}" maxlength="200" required />
+                </label>
+                <button type="submit" class="secondary sm">保存</button>
+              </form>
+            </details>
+          `
+        : raw("")}
       ${isAdmin
         ? html`
             <form method="post" action="/shortages/${it.id}/delete" class="shortage-del"

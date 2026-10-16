@@ -42,7 +42,7 @@ shortages.get("/", async (c) => {
   if (propertyId) {
     items = await all(
       db,
-      `SELECT s.id, s.body, s.kind, s.status, s.created_at, s.done_at, s.cleaning_id,
+      `SELECT s.id, s.body, s.kind, s.status, s.created_at, s.done_at, s.cleaning_id, s.created_by,
               cu.name AS created_by_name, du.name AS done_by_name
          FROM shortage s
          JOIN user cu ON cu.id = s.created_by
@@ -104,6 +104,25 @@ async function setStatus(c, status, okMsg) {
   }
   return c.redirect(to(`/shortages?property=${s.property_id}`, okMsg));
 }
+
+// ─────────────────────────────────────────────
+// POST /shortages/:id/edit  内容・種類の修正（登録者本人 or admin）
+// ─────────────────────────────────────────────
+shortages.post("/:id/edit", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  const body = await form(c);
+  if (!body) return badReq(c);
+  const s = await one(c.env.DB, "SELECT id, property_id, created_by FROM shortage WHERE id = ?", id);
+  if (!s) return c.notFound();
+  const me = c.get("user");
+  if (me.role !== "admin" && s.created_by !== me.id) return c.text("Forbidden", 403);
+
+  const text = String(body.body || "").trim().slice(0, 200);
+  if (!text) return c.redirect(to(`/shortages?property=${s.property_id}`, "内容を入力してください"));
+  const kind = String(body.kind || "") === "damage" ? "damage" : "shortage";
+  await run(c.env.DB, "UPDATE shortage SET body = ?, kind = ? WHERE id = ?", text, kind, id);
+  return c.redirect(to(`/shortages?property=${s.property_id}`, "修正しました"));
+});
 
 shortages.post("/:id/done", (c) => setStatus(c, "done", "対応済みにしました"));
 shortages.post("/:id/reopen", (c) => setStatus(c, "open", "未対応に戻しました"));
