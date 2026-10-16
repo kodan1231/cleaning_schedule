@@ -1,20 +1,36 @@
 {
-  "name": "cleaning-schedule",
-  "compatibility_date": "2026-09-01",
-  "main": "src/index.js",
-  "assets": { "directory": "./public", "binding": "ASSETS" },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "cleaning_schedule",
-      "database_id": "8299819e-57ec-4aa5-82f2-11ad6b8baf19"
-    }
-  ],
-  // R2 は当面未使用。将来有効化したら追加してデプロイ（docs/02 §7.4）
-  // "r2_buckets": [
-  //   { "binding": "PHOTOS", "bucket_name": "cleaning-schedule-photos" }
-  // ],
-  // 毎日 JST 6:00（UTC 前日21:00）。iCal 同期は1日1回（docs/02 §1.4）
-  "triggers": { "crons": ["0 21 * * *"] },
-  "vars": { "APP_TZ": "Asia/Tokyo", "APP_NAME": "民泊清掃" }
+	"name": "cleaning-schedule",
+	"compatibility_date": "2026-09-01",
+	"main": "src/index.js",
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "cleaning_schedule",
+			"database_id": "b1d36b4c-318f-49b3-ab1d-e742fd63938d"
+		},
+		{
+			"binding": "cleaning_schedule",
+			"database_name": "cleaning_schedule",
+			"database_id": "b1d36b4c-318f-49b3-ab1d-e742fd63938d",
+			"remote": true
+		}
+	],
+	// R2 は当面未使用。将来有効化したら追加してデプロイ（docs/02 §7.4）
+	// "r2_buckets": [
+	//   { "binding": "PHOTOS", "bucket_name": "cleaning-schedule-photos" }
+	// ],
+	// 毎日 JST 6:00（UTC 前日21:00）。iCal 同期は1日1回（docs/02 §1.4）
+	"triggers": {
+		"crons": [
+			"0 21 * * *"
+		]
+	},
+	"vars": {
+		"APP_TZ": "Asia/Tokyo",
+		"APP_NAME": "民泊清掃"
+	}
 }
