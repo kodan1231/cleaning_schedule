@@ -11,12 +11,6 @@
 			"binding": "DB",
 			"database_name": "cleaning_schedule",
 			"database_id": "b1d36b4c-318f-49b3-ab1d-e742fd63938d"
-		},
-		{
-			"binding": "cleaning_schedule",
-			"database_name": "cleaning_schedule",
-			"database_id": "b1d36b4c-318f-49b3-ab1d-e742fd63938d",
-			"remote": true
 		}
 	],
 	// R2 は当面未使用。将来有効化したら追加してデプロイ（docs/02 §7.4）
